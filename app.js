@@ -5,7 +5,7 @@ const ANOS=Object.keys(DADOS.anos);
 const TODOS=Object.keys(DADOS.meses).sort();
 // Cores dos dados (significado fixo; ver DESIGN.md)
 const COR={liquido:'#4f6b57',taxa:'#b9767f',anos:['#b5a17c','#4f6b57'],sobe:'#4f6b57',desce:'#b9767f',marca:'#8a7250',apagado:'#d9cdb6',
-  grade:'#f1eadf',tinta:'#2b2926',tinta2:'#7a746b',calor:['#f3ecdf','#e0dcc4','#b3bfa4','#6f8a74','#3f5a47']};
+  grade:'#f1eadf',tinta:'#2b2926',tinta2:'#7a746b',calor:['#f3ecdf','#e0dcc4','#b3bfa4','#5e7a64','#3f5a47']};
 const brl=v=>v==null||isNaN(v)?'sem dados':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=v=>v==null||isNaN(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
 const num=(v,d=0)=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -29,11 +29,11 @@ const NOME_METRICA={bruto:'Receita bruta',liquido:'Receita líquida',taxa:'Taxa 
 
 /* ---------- componentes ---------- */
 function tabela(cab,linhas,total){
-  const t=el('table');t.append(el('thead',{},el('tr',{},cab.map(c=>el('th',{text:c})))));
+  const t=el('table');t.append(el('thead',{},el('tr',{},cab.map(c=>el(c?'th':'td',{text:c||''})))));
   const tb=el('tbody');linhas.forEach((l,i)=>{const tr=el('tr',{class:(total&&i===linhas.length-1)?'total':''});l.forEach(c=>tr.append(el('td',{text:c})));tb.append(tr);});
-  t.append(tb);return el('div',{class:'rolagem'},t);}
+  t.append(tb);return el('div',{class:'rolagem',tabindex:'0',role:'group','aria-label':'Tabela, role para os lados'},t);}
 function cartao(titulo,filhos,extra){return el('section',{class:'cartao'},[titulo||extra?el('div',{class:'cab'},[titulo?el('h2',{text:titulo}):el('span'),extra||null]):null].concat(filhos));}
-function kpi(r,v,s){return el('div',{class:'kpi'},[el('span',{class:'r',text:r}),el('span',{class:'v',text:v}),s?el('span',{class:'s',text:s}):null]);}
+function kpi(r,v,s){return el('div',{class:'kpi'},[el('span',{class:'r',text:r}),el('span',{class:'v ajusta',text:v}),s?el('span',{class:'s',text:s}):null]);}
 function linha(nome,valorTxt,cor,extra){return el('div',{class:'linha'},[cor?el('i',{class:'pt',style:'background:'+cor}):null,el('span',{class:'n',text:nome}),extra?el('span',{class:'q',text:extra}):null,el('span',{text:valorTxt})]);}
 function seg(opcoes,atual,aoMudar,rotulo){const g=el('div',{class:'seg',role:'group','aria-label':rotulo});
   opcoes.forEach(([v,t])=>{const b=el('button',{type:'button','aria-pressed':String(v===atual),text:t});b.addEventListener('click',()=>aoMudar(v));g.append(b);});return g;}
@@ -42,6 +42,17 @@ function legenda(itens){return el('div',{class:'legenda'},itens.map(([cor,t])=>e
 function copiarCsv(btn,area,csv){
   const rotulo=btn.textContent, falha=()=>{area.hidden=false;area.value=csv;area.select();btn.textContent='Selecione e copie o texto abaixo';};
   try{navigator.clipboard.writeText(csv).then(()=>{btn.textContent='Copiado';setTimeout(()=>btn.textContent=rotulo,1800);},falha);}catch(e){falha();}
+}
+
+/* encolhe o texto só o suficiente para caber: nenhum valor sobrepõe o cartão ou o gráfico */
+function encaixa(raiz){
+  (raiz||document).querySelectorAll('.ajusta').forEach(e=>{
+    e.style.fontSize='';
+    let f=parseFloat(getComputedStyle(e).fontSize)||15;
+    const min=Math.max(10,f-6);
+    let n=0;
+    while(f>min && e.scrollWidth>e.clientWidth+0.5 && n++<20){ f=Math.round((f-0.5)*10)/10; e.style.fontSize=f+'px'; }
+  });
 }
 
 /* dica flutuante para elementos fora dos gráficos */
@@ -73,7 +84,7 @@ function areaGrafico(rotulo){const cv=el('canvas',{role:'img','aria-label':rotul
 function rosca(partes,centroValor,centroRotulo,fmt){
   const total=partes.reduce((s,p)=>s+p.valor,0);
   const cv=el('canvas',{role:'img','aria-label':partes.map(p=>p.nome+' '+fmt(p.valor)).join(', ')});
-  const caixa=el('div',{class:'rosca-cv'},[cv,el('div',{class:'rosca-centro'},[el('b',{text:centroValor}),el('span',{text:centroRotulo})])]);
+  const caixa=el('div',{class:'rosca-cv'},[cv,el('div',{class:'rosca-centro'},[el('b',{class:'ajusta',text:centroValor}),el('span',{text:centroRotulo})])]);
   const linhas=el('div',{class:'linhas'},partes.map(p=>linha(p.nome,fmt(p.valor),p.cor,total?pct(p.valor/total):'')));
   const raiz=el('div',{class:'rosca'},[caixa,linhas]);
   setTimeout(()=>{if(cv.isConnected)desenha(cv,{type:'doughnut',data:{labels:partes.map(p=>p.nome),datasets:[{data:partes.map(p=>p.valor),backgroundColor:partes.map(p=>p.cor),borderWidth:0,spacing:2,borderRadius:4}]},
@@ -83,6 +94,7 @@ function rosca(partes,centroValor,centroRotulo,fmt){
 
 /* ---------- estado ---------- */
 const SECOES=[
+  {id:'inicio',nome:'Início',curto:'Início',ico:'<path d="M4 11.5L12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/>'},
   {id:'visao',nome:'Visão geral',curto:'Geral',filtro:true,barra:true,ico:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'},
   {id:'ganhos',nome:'Ganhos',curto:'Ganhos',barra:true,ico:'<path d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3.2 4.5 1.5 4.5 3.3-2 3.2-4.5 3.2-4.5-1.4-4.5-3.2"/>'},
   {id:'mes',nome:'Mês a mês',curto:'Mês',fim:true,ico:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>'},
@@ -96,7 +108,7 @@ const SECOES=[
   {id:'sobre',nome:'Sobre os dados',rodape:true,ico:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>'}
 ];
 const icone=s=>el('span',{html:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">'+s+'</svg>',style:'display:inline-flex'});
-let pagina='visao', de='2026-01', ate='2026-11', mesSel=TODOS[TODOS.length-1], metrica='bruto', pend=null, anoRank=ANOS[ANOS.length-1];
+let pagina='inicio', de='2026-01', ate='2026-11', mesSel=TODOS[TODOS.length-1], metrica='bruto', pend=null, anoRank=ANOS[ANOS.length-1];
 let pv={linhas:'mes',valor:'bruto',como:'valor',ord:null};
 const RES=(DADOS.reservas||(DADOS.futuras||[]).map(f=>Object.assign({status:'programada'},f))).slice();
 const HOJE=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
@@ -143,8 +155,8 @@ function iniciaCustos(){
       cap.db=db;
       db.collection('custos').onSnapshot(snap=>{clearTimeout(limite);
         custos=snap.docs.map(d=>normalizaCusto(d.id,d.data())).filter(Boolean);custoEstado='pronto';
-        if(pagina==='resultado'&&pintaCustos)pintaCustos();},falha);
-      db.collection('reservas').onSnapshot(snap=>{reservasFora=snap.docs.map(d=>normalizaReserva(d.id,d.data())).filter(Boolean);repintaCustos();},()=>{});
+        if(pagina==='resultado'&&pintaCustos)pintaCustos();repintaNotif();},falha);
+      db.collection('reservas').onSnapshot(snap=>{reservasFora=snap.docs.map(d=>normalizaReserva(d.id,d.data())).filter(Boolean);repintaCustos();repintaNotif();},()=>{});
     }).catch(falha);
     window.claude.use('assets').then(a=>{cap.assets=a||null;repintaCustos();}).catch(()=>{});
   }catch(e){falha();}
@@ -158,8 +170,118 @@ function textoErro(e){const c=e&&e.code;
 const dataBR=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
 const temDado=m=>!!DADOS.meses[m]||custos.some(c=>c.data.slice(0,7)===m)||reservasFora.some(c=>c.entrada.slice(0,7)===m);
 
+/* ---------- notificações ----------
+   Geradas aqui a partir das reservas, dos pagamentos e dos custos já carregados.
+   O que já foi lido fica guardado neste aparelho. */
+const CHAVE_LIDAS='recanto-notif-lidas';
+function lidas(){try{return new Set(JSON.parse(localStorage.getItem(CHAVE_LIDAS)||'[]'));}catch(e){return new Set();}}
+function guardaLidas(s){try{localStorage.setItem(CHAVE_LIDAS,JSON.stringify([...s].slice(-400)));}catch(e){}}
+const ICO_NT={chegada:'<path d="M3 20h18"/><path d="M5 20V9l7-5 7 5v11"/><path d="M10 20v-5h4v5"/>',
+  saida:'<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M14 16l4-4-4-4"/><path d="M18 12H9"/>',
+  custo:'<path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h10"/><path d="M16 13.5h.01"/>',
+  pagamento:'<path d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3.2 4.5 1.5 4.5 3.3-2 3.2-4.5 3.2-4.5-1.4-4.5-3.2"/>',
+  mes:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  dados:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>'};
+function somaDias(d,n){const t=new Date(d+'T12:00:00');t.setDate(t.getDate()+n);return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
+function notificacoes(){
+  const out=[], reservas=RES.filter(r=>r.tipo==='reserva');
+  const nome=r=>r.hospede||'';
+  reservas.forEach(r=>{
+    const d=diasEntre(HOJE,r.entrada);
+    if(d===0) out.push({id:'chega:'+(r.codigo||r.entrada),tipo:'chegada',quando:r.entrada,ir:'reservas',
+      titulo:nome(r)?'Chegada hoje: '+nome(r):'Chegada hoje',texto:r.noites+(r.noites===1?' noite':' noites')+' · sai '+DIA_MES(r.saida)});
+    else if(d>=1&&d<=3) out.push({id:'prep:'+(r.codigo||r.entrada),tipo:'chegada',quando:r.entrada,ir:'reservas',
+      titulo:(nome(r)||'Reserva')+(d===1?' chega amanhã':' chega em '+d+' dias'),texto:'Deixe a casa pronta · '+DIA_MES(r.entrada)+' a '+DIA_MES(r.saida)});
+    if(r.saida===HOJE) out.push({id:'sai:'+(r.codigo||r.saida),tipo:'saida',quando:r.saida,ir:'resultado',
+      titulo:nome(r)?'Saída hoje: '+nome(r):'Saída hoje',texto:'Registre a limpeza e os custos desta estadia'});
+    if(r.status==='programada'&&r.pagamento){const p=diasEntre(HOJE,r.pagamento);
+      if(p>=0&&p<=7) out.push({id:'pag:'+(r.codigo||r.pagamento),tipo:'pagamento',quando:r.pagamento,ir:'ganhos',
+        titulo:'Repasse de '+brl(r.liquido)+(p===0?' hoje':p===1?' amanhã':' em '+p+' dias'),texto:(nome(r)?'Reserva de '+nome(r)+' · ':'Reserva de ')+DIA_MES(r.entrada)});}
+  });
+  if(custoEstado==='pronto'){
+    reservas.filter(r=>r.saida<HOJE&&r.saida>=somaDias(HOJE,-60)).forEach(r=>{
+      const fim=somaDias(r.saida,3);
+      if(!custos.some(c=>c.data>=r.entrada&&c.data<=fim))
+        out.push({id:'custo:'+(r.codigo||r.saida),tipo:'custo',quando:r.saida,ir:'resultado',
+          titulo:nome(r)?'Sem custos lançados: '+nome(r):'Estadia sem custos lançados',texto:DIA_MES(r.entrada)+' a '+DIA_MES(r.saida)+' · '+brl(r.liquido)+' recebidos'});});
+  }
+  const hojeDia=+HOJE.slice(8,10);
+  if(hojeDia<=7){const m=somaDias(HOJE.slice(0,8)+'01',-1).slice(0,7), d=DADOS.meses[m];
+    if(d) out.push({id:'fecha:'+m,tipo:'mes',quando:HOJE.slice(0,8)+'01',ir:'ganhos',
+      titulo:NOMES_L[+m.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' fechou com '+brl(d[1]),texto:'Receita bruta de '+brl(d[0])+' · taxa de '+brl(r2(d[0]-d[1]))});}
+  if(DADOS.atualizado){const p=DADOS.atualizado.split('/'), iso=p[2]+'-'+p[1]+'-'+p[0], at=diasEntre(iso,HOJE);
+    if(at>=20) out.push({id:'dados:'+iso,tipo:'dados',quando:iso,ir:'sobre',
+      titulo:'Dados do Airbnb de '+DADOS.atualizado,texto:'Já faz '+at+' dias. Vale atualizar a carga.'});}
+  const L=lidas();
+  out.forEach(n=>n.nova=!L.has(n.id));
+  return out.sort((x,y)=>(y.nova?1:0)-(x.nova?1:0)||y.quando.localeCompare(x.quando));
+}
+function atualizaSelo(){
+  const s=document.getElementById('selo');if(!s)return;
+  const n=notificacoes().filter(x=>x.nova).length;
+  s.textContent=n>9?'9+':String(n);s.hidden=n===0;
+  const b=document.getElementById('btnSino');if(b)b.setAttribute('aria-label',n?'Notificações, '+n+(n===1?' nova':' novas'):'Notificações');
+}
+function pintaNotif(){
+  const lista=document.getElementById('notifLista');if(!lista)return;
+  const itens=notificacoes();
+  document.getElementById('btnLidas').disabled=!itens.some(n=>n.nova);
+  if(!itens.length){lista.replaceChildren(el('p',{class:'notif-vazio',text:'Nada por aqui. Quando houver chegada, saída, repasse ou custo a lançar, aparece nesta lista.'}));return;}
+  lista.replaceChildren(...itens.map(n=>{
+    const b=el('button',{type:'button',class:'nt'+(n.nova?' nova':'')},[
+      el('span',{class:'nt-i '+n.tipo,html:'<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO_NT[n.tipo]||'')+'</svg>'}),
+      el('span',{class:'nt-t'},[el('b',{text:n.titulo}),el('span',{text:n.texto}),el('em',{text:dataBR(n.quando)})]),
+      n.nova?el('span',{class:'ponto','aria-label':'Nova'}):null]);
+    b.addEventListener('click',()=>{const L=lidas();L.add(n.id);guardaLidas(L);fechaNotif();if(n.ir)ir(n.ir);else{pintaNotif();atualizaSelo();}});
+    return b;}));
+}
+function abreNotif(){const g=document.getElementById('notif');pintaNotif();g.hidden=false;document.getElementById('veuNotif').hidden=false;
+  document.getElementById('btnSino').setAttribute('aria-expanded','true');const f=g.querySelector('.notif-x');if(f)f.focus();}
+function fechaNotif(){document.getElementById('notif').hidden=true;document.getElementById('veuNotif').hidden=true;
+  const b=document.getElementById('btnSino');if(b){b.setAttribute('aria-expanded','false');b.focus();}}
+function repintaNotif(){atualizaSelo();if(!document.getElementById('notif').hidden)pintaNotif();if(pagina==='inicio')render();}
+
 /* ---------- seções ---------- */
 const PG={};
+PG.inicio=pg=>{
+  const h=new Date().getHours(), saud=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
+  const reservas=RES.filter(r=>r.tipo==='reserva');
+  const naCasa=reservas.filter(r=>r.entrada<=HOJE&&r.saida>HOJE).sort((x,y)=>x.saida.localeCompare(y.saida));
+  const proximas=reservas.filter(r=>r.entrada>HOJE).sort((x,y)=>x.entrada.localeCompare(y.entrada));
+  pg.append(el('p',{class:'ini-saud',text:saud+'.'}),
+    el('p',{class:'ini-sub',text:naCasa.length?'A casa está ocupada.':proximas.length?'A casa está livre. A próxima chegada é '+DIA_MES(proximas[0].entrada)+'.':'A casa está livre e não há reserva marcada.'}));
+
+  const ini=r=>r.hospede?r.hospede.trim().split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase():String(+r.entrada.slice(8,10));
+  const quem=r=>r.hospede||('Reserva de '+DIA_MES(r.entrada));
+  const cartaoHosp=(r,rot)=>el('div',{class:'ini-agora'},[el('span',{class:'av','aria-hidden':'true',text:ini(r)}),
+    el('span',{class:'qm'},[el('b',{text:quem(r)}),el('span',{text:rot})]),el('span',{class:'vl',text:brl(r.liquido)})]);
+  if(naCasa.length) pg.append(cartao('Na casa agora',naCasa.map(r=>cartaoHosp(r,'Sai '+DIA_MES(r.saida)+' · '+diasEntre(HOJE,r.saida)+(diasEntre(HOJE,r.saida)===1?' noite':' noites')+' restando'))));
+  if(proximas.length) pg.append(cartao('Próximas chegadas',proximas.slice(0,3).map(r=>{const d=diasEntre(HOJE,r.entrada);
+    return cartaoHosp(r,(d===0?'Chega hoje':d===1?'Chega amanhã':'Chega em '+d+' dias')+' · '+DIA_MES(r.entrada)+' a '+DIA_MES(r.saida));})));
+
+  const ym=HOJE.slice(0,7), d=DADOS.meses[ym], pago=d?d[1]:0;
+  const prog=r2(RES.filter(r=>r.status==='programada'&&r.pagamento&&r.pagamento.slice(0,7)===ym).reduce((s,r)=>s+r.liquido,0));
+  const nm=noitesPorMes(), oc=nm[ym]||0, gastos=r2(custos.filter(c=>c.data.slice(0,7)===ym).reduce((s,c)=>s+c.valor,0));
+  pg.append(cartao(NOMES_L[+ym.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' de '+ym.slice(0,4),[
+    el('div',{class:'linhas'},[linha('Recebido',brl(pago),COR.liquido),linha('Programado',brl(prog),'#cfdccf'),
+      custoEstado==='pronto'&&gastos?linha('Custos lançados',brl(-gastos),COR.taxa):null,
+      el('div',{class:'linha total-g'},[el('span',{class:'n',text:'Total do mês'}),el('span',{class:'ajusta',text:brl(r2(pago+prog-(custoEstado==='pronto'?gastos:0)))})]),
+      linha('Ocupação do mês',pct(oc/diasNoMes(ym)),null,num(oc)+(oc===1?' noite':' noites'))])]));
+
+  const ats=[['resultado','Lançar custo','<path d="M12 5v14M5 12h14"/>'],['reservas','Ver reservas','<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'],
+    ['ganhos','Ganhos','<path d="M5 20V10M10 20V4M15 20v-8M20 20V7"/>'],['visao','Visão geral','<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>']];
+  pg.append(cartao('Atalhos',[el('div',{class:'atalhos-ini'},ats.map(([id,t,ic])=>{
+    const b=el('button',{type:'button'},[icone(ic),el('span',{text:t})]);b.addEventListener('click',()=>ir(id));return b;}))]));
+
+  const ev=[];
+  reservas.filter(r=>r.status!=='programada'&&r.pagamento&&r.pagamento<=HOJE).forEach(r=>ev.push({q:r.pagamento,t:'Repasse recebido',s:quem(r),v:brl(r.liquido)}));
+  custos.forEach(c=>ev.push({q:c.data,t:'Custo lançado',s:c.categoria+(c.descricao?' · '+c.descricao:''),v:'-'+brl(c.valor)}));
+  reservasFora.forEach(c=>ev.push({q:c.entrada,t:'Reserva por fora',s:c.canal+' · '+DIA_MES(c.entrada)+' a '+DIA_MES(c.saida),v:brl(c.valor)}));
+  ev.sort((x,y)=>y.q.localeCompare(x.q));
+  pg.append(cartao('Atualizações',[ev.length?el('div',{class:'atual'},ev.slice(0,6).map(e=>el('div',{class:'at-i'},[
+      el('span',{class:'at-t'},[el('b',{text:e.t}),el('span',{text:e.s})]),
+      el('span',{class:'at-v'},[el('b',{text:e.v}),el('span',{text:dataBR(e.q)})])]))):el('p',{class:'suave',text:'Nada registrado ainda.'})]));
+};
 PG.visao=pg=>{
   const meses=listaMeses(de,ate).filter(m=>DADOS.meses[m]), t=soma(meses), A=anoExato(de,ate);
   const k=el('div',{class:'kpis'},[kpi('Receita bruta',brl(t.bruto)),kpi('Taxa Airbnb',brl(t.taxa),t.aliq==null?'':pct(t.aliq)+' da bruta'),kpi('Receita líquida',brl(t.liquido))]);
@@ -252,12 +374,12 @@ PG.sazonalidade=pg=>{
   const positivos=TODOS.map(m=>valor(m,metrica)).filter(v=>v>0).sort((x,y)=>x-y);
   const cortes=[.2,.4,.6,.8].map(q=>positivos[Math.min(positivos.length-1,Math.floor(q*positivos.length))]);
   const classe=v=>cortes.filter(c=>v>=c).length;
-  const grade=el('div',{class:'calor',role:'table','aria-label':nome+' por mês e ano'});
+  const grade=el('div',{class:'calor',role:'group','aria-label':nome+' por mês e ano'});
   grade.append(el('span',{class:'cab-a'}));
   NOMES.forEach(n=>grade.append(el('span',{class:'cab-m',text:n})));
   ANOS.forEach(an=>{grade.append(el('span',{class:'cab-a',text:an}));
     NOMES.forEach((n,i)=>{const m=ym2(an,i+1), v=valor(m,metrica);
-      const c=el('button',{type:'button',class:'cel'+(v==null?' nulo':v===0?' zero':''),text:compacto(v),'aria-label':NOMES_L[i]+' de '+an+': '+brl(v)});
+      const c=el('button',{type:'button',class:'cel'+(v==null?' nulo':v===0?' zero':''),text:compacto(v),'aria-label':NOMES_L[i]+' de '+an+': '+compacto(v)+(v==null?'':' ('+brl(v)+')')});
       if(v==null)c.disabled=true;
       else{ if(v>0){const k=classe(v);c.style.background=COR.calor[k];if(k>=3)c.style.color='#fff';}
         comDica(c,rot(m),nome+': '+brl(v));c.addEventListener('click',()=>{dicaEl().hidden=true;mesSel=m;ir('mes');}); }
@@ -270,7 +392,7 @@ PG.sazonalidade=pg=>{
   const ord=mesesAno.map(m=>[m,valor(m,metrica)]).sort((x,y)=>y[1]-x[1]), total=ord.reduce((s,x)=>s+x[1],0), maximo=ord.length?ord[0][1]:0;
   const lista=el('div',{class:'rank'});let ac=0,cortou=false;
   ord.forEach(([m,v])=>{ac+=v;
-    const b=el('button',{type:'button',class:'rk','aria-label':NOMES_L[+m.slice(5)-1]+': '+brl(v)},[el('span',{text:NOMES[+m.slice(5)-1]}),
+    const b=el('button',{type:'button',class:'rk'},[el('span',{class:'so-leitor',text:NOMES_L[+m.slice(5)-1]}),el('span',{'aria-hidden':'true',text:NOMES[+m.slice(5)-1]}),
       el('div',{class:'trilho'},el('i',{style:'width:'+(maximo?v/maximo*100:0)+'%'})),el('span',{text:brl(v)}),el('span',{class:'p',text:total?pct(v/total):'—'})]);
     comDica(b,rot(m),'Acumulado até aqui: '+(total?pct(ac/total):'—'));
     b.addEventListener('click',()=>{dicaEl().hidden=true;mesSel=m;ir('mes');});lista.append(b);
@@ -300,7 +422,7 @@ PG.dinamica=pg=>{
 
   const t=el('table',{class:'din'}), cabs=[{t:pv.linhas==='mes'?'Mês':pv.linhas==='tri'?'Trimestre':'Semestre',col:null}].concat(comp.map((a,k)=>({t:a,col:k})),[{t:'Variação',col:2}]);
   t.append(el('thead',{},el('tr',{},cabs.map(c=>{const ativo=pv.ord&&pv.ord.col===c.col&&c.col!=null;
-    const b=el('button',{type:'button',text:c.t+(ativo?(pv.ord.dir==='desc'?' ↓':' ↑'):''),'aria-label':c.col==null?'Voltar à ordem original':'Ordenar por '+c.t});
+    const b=el('button',{type:'button',text:c.t+(ativo?(pv.ord.dir==='desc'?' ↓':' ↑'):''),'aria-label':c.t+(c.col==null?': voltar à ordem original':': ordenar por esta coluna')});
     b.addEventListener('click',()=>{ if(c.col==null)pv.ord=null; else if(!ativo)pv.ord={col:c.col,dir:'desc'}; else if(pv.ord.dir==='desc')pv.ord={col:c.col,dir:'asc'}; else pv.ord=null; render(); });
     return el('th',{},b);}))));
   const tb=el('tbody');
@@ -571,6 +693,7 @@ function render(){
   document.querySelectorAll('.atalho').forEach(b=>{const k=b.dataset.atalho;const on=k==='tudo'?(de===TODOS[0]&&ate===TODOS[TODOS.length-1]):(de===DADOS.anos[k].ini&&ate===DADOS.anos[k].fim);b.setAttribute('aria-pressed',String(on));});
   const antiga=document.getElementById('pagina'), nova=el('div',{id:'pagina'});antiga.replaceWith(nova);
   try{PG[pagina](nova);}catch(e){nova.append(el('p',{class:'suave',text:'Não foi possível montar esta seção.'}));if(window.console)console.error(e);}
+  encaixa(nova);atualizaSelo();
 }
 function ir(id){pagina=id;try{location.hash=id;}catch(e){}document.getElementById('app').classList.remove('aberta');fechaPop();render();window.scrollTo({top:0});}
 (function iniciar(){
@@ -586,10 +709,16 @@ function ir(id){pagina=id;try{location.hash=id;}catch(e){}document.getElementByI
   document.getElementById('btnMenu').addEventListener('click',()=>{
     app.classList.toggle('recolhida');try{localStorage.setItem('recanto-menu',app.classList.contains('recolhida')?'recolhido':'aberto');}catch(e){}setTimeout(()=>graficos.forEach(g=>g.resize()),240);});
   document.getElementById('veu').addEventListener('click',()=>app.classList.remove('aberta'));
+  ['marcaLado','marcaApp'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',()=>ir('inicio'));});
+  document.getElementById('btnSino').addEventListener('click',()=>{document.getElementById('notif').hidden?abreNotif():fechaNotif();});
+  document.getElementById('btnFechaNotif').addEventListener('click',fechaNotif);
+  document.getElementById('veuNotif').addEventListener('click',fechaNotif);
+  document.getElementById('btnLidas').addEventListener('click',()=>{const L=lidas();notificacoes().forEach(n=>L.add(n.id));guardaLidas(L);pintaNotif();atualizaSelo();});
+  let tr=null;addEventListener('resize',()=>{clearTimeout(tr);tr=setTimeout(()=>encaixa(),160);});
   document.getElementById('btnPeriodo').addEventListener('click',e=>{e.stopPropagation();document.getElementById('popPeriodo').hidden?abrePop():fechaPop();});
   document.getElementById('popPeriodo').addEventListener('click',e=>e.stopPropagation());
   document.addEventListener('click',fechaPop);
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){fechaPop();app.classList.remove('aberta');}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){fechaPop();app.classList.remove('aberta');if(!document.getElementById('notif').hidden)fechaNotif();}});
   document.querySelectorAll('.atalho').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.atalho;
     if(k==='tudo'){de=TODOS[0];ate=TODOS[TODOS.length-1];}else{de=DADOS.anos[k].ini;ate=DADOS.anos[k].fim;}fechaPop();render();}));
   window.addEventListener('hashchange',()=>{const h=(location.hash||'').slice(1);if(h&&h!==pagina&&PG[h]){pagina=h;render();}});

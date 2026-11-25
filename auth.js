@@ -24,7 +24,11 @@
     const senha = el('input', { type: 'password', id: 'lgSenha', autocomplete: 'current-password' });
     const entrar = el('button', { type: 'submit', text: 'Entrar' });
     const link = el('button', { type: 'button', class: 'sec', text: 'Receber link por e-mail' });
+    const marca = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    marca.setAttribute('viewBox', '0 0 30 30'); marca.setAttribute('aria-hidden', 'true'); marca.setAttribute('class', 'folha');
+    marca.innerHTML = '<path d="M6 24C6 12 13 5 25 5c0 12-7 19-19 19z"/><path d="M6 24L18 12"/>';
     const form = el('form', {}, [
+      marca,
       el('h1', { text: 'Recanto Agradável' }),
       el('label', { for: 'lgEmail', text: 'E-mail' }), email,
       el('label', { for: 'lgSenha', text: 'Senha' }), senha,
