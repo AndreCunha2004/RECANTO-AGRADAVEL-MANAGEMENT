@@ -84,19 +84,28 @@ function rosca(partes,centroValor,centroRotulo,fmt){
 /* ---------- estado ---------- */
 const SECOES=[
   {id:'visao',nome:'Visão geral',curto:'Geral',filtro:true,barra:true,ico:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'},
-  {id:'mes',nome:'Mês a mês',curto:'Mês',barra:true,fim:true,ico:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>'},
-  {id:'comparativo',nome:'Comparativo',curto:'Comparar',barra:true,ico:'<path d="M5 20V10M10 20V4M15 20v-8M20 20V7"/>'},
+  {id:'ganhos',nome:'Ganhos',curto:'Ganhos',barra:true,ico:'<path d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3.2 4.5 1.5 4.5 3.3-2 3.2-4.5 3.2-4.5-1.4-4.5-3.2"/>'},
+  {id:'mes',nome:'Mês a mês',curto:'Mês',fim:true,ico:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>'},
+  {id:'comparativo',nome:'Comparativo',curto:'Comparar',ico:'<path d="M5 20V10M10 20V4M15 20v-8M20 20V7"/>'},
   {id:'sazonalidade',nome:'Sazonalidade',ico:'<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>'},
   {id:'dinamica',nome:'Tabela dinâmica',fim:true,ico:'<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 10h18M10 10v10"/>'},
   {id:'taxas',nome:'Taxas Airbnb',filtro:true,ico:'<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>'},
   {id:'ocupacao',nome:'Ocupação',ico:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'},
-  {id:'reservas',nome:'Reservas',fim:true,ico:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'},
+  {id:'reservas',nome:'Reservas',curto:'Reservas',barra:true,fim:true,ico:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'},
   {id:'resultado',nome:'Custos e lucro',curto:'Custos',filtro:true,barra:true,ico:'<path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h10"/><path d="M16 13.5h.01"/>'},
   {id:'sobre',nome:'Sobre os dados',rodape:true,ico:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>'}
 ];
 const icone=s=>el('span',{html:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">'+s+'</svg>',style:'display:inline-flex'});
 let pagina='visao', de='2026-01', ate='2026-11', mesSel=TODOS[TODOS.length-1], metrica='bruto', pend=null, anoRank=ANOS[ANOS.length-1];
 let pv={linhas:'mes',valor:'bruto',como:'valor',ord:null};
+const RES=(DADOS.reservas||(DADOS.futuras||[]).map(f=>Object.assign({status:'programada'},f))).slice();
+const HOJE=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+const diasEntre=(x,y)=>Math.round((Date.parse(y)-Date.parse(x))/864e5);
+const DIA_MES=s=>{const [y,m,d]=s.split('-');return +d+' '+NOMES[+m-1]+(y!==HOJE.slice(0,4)?' '+y:'');};
+// noites de estadia que caem em cada mês (para ocupação mensal)
+function noitesPorMes(){const out={};RES.filter(r=>r.tipo==='reserva'&&r.entrada&&r.saida).forEach(r=>{let d=new Date(r.entrada+'T12:00:00');const f=new Date(r.saida+'T12:00:00');while(d<f){const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');out[k]=(out[k]||0)+1;d.setDate(d.getDate()+1);}});return out;}
+const diasNoMes=ym=>new Date(+ym.slice(0,4),+ym.slice(5),0).getDate();
+let filtroRes='proximas', buscaRes='', mesGanho=null;
 let comp=[ANOS[ANOS.length-2],ANOS[ANOS.length-1]];
 function seletorComp(){const mk=(i,rotulo)=>{const s=el('select',{'aria-label':rotulo});ANOS.forEach(x=>{const o=el('option',{value:x,text:x});if(x===comp[i])o.selected=true;s.append(o);});
   s.addEventListener('change',()=>{const v=s.value,o=comp[1-i];comp[i]=v;if(v===o)comp[1-i]=ANOS.find(x=>x!==v);comp.sort();render();});return s;};
@@ -353,27 +362,80 @@ PG.ocupacao=pg=>{
     ['Estadias (aprox.)'].concat(as.map(A=>num(A.noites/A.mediaEstadia))),
     ['Diária média'].concat(as.map(A=>brl(acom(A)/A.noites))),
     ['Receita por dia do período'].concat(as.map(A=>brl(acom(A)/A.dias)))])]));
-  pg.append(el('p',{class:'suave',text:'A ocupação por mês aparece quando o calendário do Airbnb for importado.'}));
+  if(RES.some(r=>r.status==='concluida')){const nm=noitesPorMes(), anosR=[...new Set(Object.keys(nm).map(k=>k.slice(0,4)))].sort();
+    const ano=anosR.includes(anoRank)?anoRank:anosR[anosR.length-1], ms=listaMeses(ano+'-01',ano+'-12'), vals=ms.map(m=>(nm[m]||0)/diasNoMes(m));
+    const g=areaGrafico('Ocupação por mês em '+ano);
+    pg.append(cartao('Ocupação por mês',[g.caixa],seg(anosR.map(x=>[x,x]),ano,x=>{anoRank=x;render();},'Ano')));
+    desenha(g.cv,{type:'bar',data:{labels:NOMES,datasets:[{label:'Ocupação',data:vals.map(v=>r2(v*100)),backgroundColor:COR.marca,borderRadius:4,maxBarThickness:28}]},
+      options:{maintainAspectRatio:false,scales:Object.assign(escalas(v=>v+'%'),{y:{beginAtZero:true,max:100,border:{display:false},grid:{color:COR.grade},ticks:{callback:v=>v+'%',maxTicksLimit:5}}}),
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>pct(vals[c.dataIndex])+' · '+(nm[ms[c.dataIndex]]||0)+' noites'}}}}});}
+  else pg.append(el('p',{class:'suave',text:'A ocupação por mês aparece quando o histórico de reservas for importado.'}));
 };
 PG.reservas=pg=>{
-  const F=(DADOS.futuras||[]).slice().sort((x,y)=>x.pagamento.localeCompare(y.pagamento)), R=F.filter(f=>f.tipo==='reserva');
-  if(!F.length){pg.append(el('p',{class:'suave',text:'Nenhuma reserva programada.'}));return;}
-  const s=k=>r2(R.reduce((t,f)=>t+f[k],0)), noites=R.reduce((t,f)=>t+f.noites,0), liq=r2(F.reduce((t,f)=>t+f.liquido,0)), bru=s('bruto'), tx=s('taxa');
-  const diaria=noites?r2((bru-s('limpeza')-s('pet'))/noites):null;
-  pg.append(el('div',{class:'kpis'},[kpi('Reservas',num(R.length),'confirmadas'),kpi('Noites',num(noites),'reservadas'),kpi('Diária média',brl(diaria),'sem limpeza'),
-    kpi('Receita bruta',brl(bru)),kpi('Taxa Airbnb',brl(tx),bru?pct(tx/bru)+' da bruta':''),kpi('A receber',brl(liq),'líquido programado')]));
-  const meses=[...new Set(F.map(f=>f.pagamento.slice(0,7)))].sort(), porMes=meses.map(m=>r2(F.filter(f=>f.pagamento.slice(0,7)===m).reduce((t,f)=>t+f.liquido,0)));
-  const g=areaGrafico('Valor programado por mês de pagamento');
-  pg.append(cartao('A receber por mês',[g.caixa]));
-  desenha(g.cv,{type:'bar',data:{labels:meses.map(rot),datasets:[{label:'A receber',data:porMes,backgroundColor:COR.liquido,borderRadius:4,maxBarThickness:36}]},
-    options:{maintainAspectRatio:false,scales:escalas(eixoR),plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>brl(porMes[c.dataIndex])}}}}});
-  const lista=el('div',{class:'lanc'});
-  F.forEach(f=>{const aj=f.tipo!=='reserva';
-    const sub=aj?'Estadia de '+dataBR(f.entrada)+' a '+dataBR(f.saida)+' · desconto no pagamento de '+dataBR(f.pagamento)
-      :[f.noites+(f.noites===1?' noite':' noites')+' até '+dataBR(f.saida),'bruta '+brl(f.bruto),'taxa '+brl(f.taxa)+' ('+pct(f.bruto?f.taxa/f.bruto:null)+')',f.limpeza?'limpeza '+brl(f.limpeza):'',f.pet?'pet '+brl(f.pet):'','pagamento '+dataBR(f.pagamento)].filter(Boolean).join(' · ');
-    lista.append(el('div',{class:'lc'},[el('span',{class:'quando',text:dataBR(aj?f.pagamento:f.entrada)}),el('div',{class:'oque'},[el('b',{text:aj?'Ajuste de resolução':'Reserva Airbnb'}),el('span',{text:sub})]),el('span',{class:'quanto',text:brl(f.liquido)})]));});
-  pg.append(cartao('Próximas estadias',[lista]));
-  pg.append(el('p',{class:'suave',text:'Atualizado em '+DADOS.atualizado+'.'}));
+  const reservas=RES.filter(r=>r.tipo==='reserva');
+  const situacao=r=>{ if(r.status==='programada'||r.entrada>HOJE){ if(r.entrada<=HOJE&&r.saida>HOJE)return ['agora','Hospedado agora'];
+      if(r.saida===HOJE)return ['agora','Check-out hoje']; const d=diasEntre(HOJE,r.entrada);
+      return d<=0?['agora','Hospedado agora']:['breve',d===1?'Chega amanhã':d<=14?'Chega em '+d+' dias':'Confirmada']; }
+    if(r.entrada<=HOJE&&r.saida>HOJE)return ['agora','Hospedado agora'];
+    return ['fim','Concluída']; };
+  const grupos={agora:reservas.filter(r=>r.entrada<=HOJE&&r.saida>=HOJE),proximas:reservas.filter(r=>r.entrada>HOJE),concluidas:reservas.filter(r=>r.saida<HOJE),todas:reservas};
+  const chips=el('div',{class:'chips-res',role:'group','aria-label':'Filtrar reservas'},[['agora','Hospedados agora'],['proximas','Próximas'],['concluidas','Concluídas'],['todas','Todas']].map(([k,t])=>{
+    const b=el('button',{type:'button','aria-pressed':String(filtroRes===k),text:t+' ('+grupos[k].length+')'});b.addEventListener('click',()=>{filtroRes=k;render();});return b;}));
+  const busca=el('input',{type:'search',class:'busca-res',placeholder:'Buscar hóspede ou código','aria-label':'Buscar hóspede ou código',value:buscaRes});
+  pg.append(chips,busca);
+  const lista=el('div',{class:'res-lista'}), resumo=el('div',{class:'kpis'});
+  const pinta=()=>{const t=buscaRes.trim().toLowerCase();
+    let L=grupos[filtroRes].filter(r=>!t||(r.hospede||'').toLowerCase().includes(t)||(r.codigo||'').toLowerCase().includes(t));
+    L=L.slice().sort((x,y)=>filtroRes==='proximas'||filtroRes==='agora'?x.entrada.localeCompare(y.entrada):y.entrada.localeCompare(x.entrada));
+    const noites=L.reduce((s,r)=>s+r.noites,0), bru=L.reduce((s,r)=>s+r.bruto,0), tx=L.reduce((s,r)=>s+r.taxa,0), liq=L.reduce((s,r)=>s+r.liquido,0), extra=L.reduce((s,r)=>s+r.limpeza+r.pet,0);
+    resumo.replaceChildren(kpi('Reservas',num(L.length)),kpi('Noites',num(noites),L.length?num(noites/L.length,1)+' por estadia':''),kpi('Diária média',brl(noites?r2((bru-extra)/noites):null),'sem limpeza'),
+      kpi('Receita bruta',brl(r2(bru))),kpi('Taxa Airbnb',brl(r2(tx)),bru?pct(tx/bru)+' da bruta':''),kpi(filtroRes==='concluidas'?'Recebido':'Líquido',brl(r2(liq))));
+    if(!L.length){lista.replaceChildren(el('p',{class:'suave',text:t?'Nenhuma reserva encontrada.':'Nenhuma reserva aqui.'}));return;}
+    lista.replaceChildren(...L.map(r=>{const [cls,txt]=situacao(r), ini=(r.hospede||'?').trim().split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase();
+      const ajustes=RES.filter(x=>x.tipo!=='reserva'&&x.codigo&&x.codigo===r.codigo);
+      const ant=r.data_reserva?diasEntre(r.data_reserva,r.entrada):null;
+      const det=el('div',{class:'linhas'},[linha('Código',r.codigo||'—'),r.data_reserva?linha('Reservado em',dataBR(r.data_reserva),null,ant!=null?ant+' dias de antecedência':''):null,
+        linha('Diária',brl(r.noites?r2((r.bruto-r.limpeza-r.pet)/r.noites):null)),linha('Receita bruta',brl(r.bruto)),linha('Taxa Airbnb',brl(r.taxa),null,pct(r.bruto?r.taxa/r.bruto:null)),
+        r.limpeza?linha('Taxa de limpeza',brl(r.limpeza)):null,r.pet?linha('Taxa de pet',brl(r.pet)):null,
+        ...ajustes.map(x=>linha(x.tipo==='resolucao'?'Resolução AirCover':'Ajuste',brl(x.liquido),null,dataBR(x.pagamento))),
+        linha(r.status==='programada'?'Pagamento previsto':'Pago em',dataBR(r.pagamento),null,brl(r.liquido))]);
+      return el('details',{class:'res'},[el('summary',{},[el('span',{class:'av','aria-hidden':'true',text:ini}),
+        el('span',{class:'qm'},[el('b',{text:r.hospede||'Hóspede'}),el('span',{text:DIA_MES(r.entrada)+' – '+DIA_MES(r.saida)+' · '+r.noites+(r.noites===1?' noite':' noites')})]),
+        el('span',{class:'dir'},[el('span',{class:'pill '+cls,text:txt}),el('span',{class:'vl',text:brl(r.liquido)})])]),det]);}));};
+  busca.addEventListener('input',()=>{buscaRes=busca.value;pinta();});
+  pg.append(resumo,cartao(null,[lista]));pinta();
+  const outros=RES.filter(r=>r.tipo==='credito'||(r.tipo!=='reserva'&&!r.codigo));
+  if(outros.length)pg.append(acord('Créditos do Airbnb',[tabela(['Data','Descrição','Valor'],outros.map(r=>[dataBR(r.pagamento),r.descricao||'—',brl(r.liquido)]))]));
+  if(DADOS.atualizado)pg.append(el('p',{class:'suave',text:'Atualizado em '+DADOS.atualizado+'.'}));
+};
+PG.ganhos=pg=>{
+  const nm=noitesPorMes(), prog={}, progBruto={}, progTaxa={};
+  RES.filter(r=>r.status==='programada').forEach(r=>{const k=r.pagamento.slice(0,7);prog[k]=r2((prog[k]||0)+r.liquido);progBruto[k]=r2((progBruto[k]||0)+(r.tipo==='reserva'?r.bruto:0));progTaxa[k]=r2((progTaxa[k]||0)+r.taxa);});
+  const ultimo=[TODOS[TODOS.length-1]].concat(Object.keys(prog)).sort().pop();
+  const meses=listaMeses(TODOS[0],ultimo);
+  if(!mesGanho||!meses.includes(mesGanho))mesGanho=HOJE.slice(0,7)<=ultimo&&meses.includes(HOJE.slice(0,7))?HOJE.slice(0,7):meses[meses.length-1];
+  const i=meses.indexOf(mesGanho), janela=meses.slice(Math.max(0,Math.min(i-4,meses.length-7)),Math.max(0,Math.min(i-4,meses.length-7))+7);
+  const pago=m=>DADOS.meses[m]?DADOS.meses[m][1]:0;
+  const g=areaGrafico('Pago e programado por mês');
+  pg.append(cartao('Resumo',[g.caixa,legenda([[COR.liquido,'Pago'],['#cfdccf','Programado']])]));
+  desenha(g.cv,{type:'bar',data:{labels:janela.map(rot),datasets:[
+      {label:'Pago',data:janela.map(pago),backgroundColor:janela.map(m=>m===mesGanho?COR.liquido:'#7f9886'),borderRadius:6,maxBarThickness:40},
+      {label:'Programado',data:janela.map(m=>prog[m]||0),backgroundColor:'#e3ece3',borderColor:COR.liquido,borderWidth:1.5,borderRadius:6,maxBarThickness:40}]},
+    options:{maintainAspectRatio:false,scales:escalas(eixoR,true),onClick:(e,els)=>{if(els.length){mesGanho=janela[els[0].index];render();}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(c.parsed.y)}}}}});
+  const ant=el('button',{type:'button','aria-label':'Mês anterior',text:'‹'}), prox=el('button',{type:'button','aria-label':'Próximo mês',text:'›'});
+  if(i<=0)ant.disabled=true;if(i>=meses.length-1)prox.disabled=true;
+  ant.addEventListener('click',()=>{mesGanho=meses[i-1];render();});prox.addEventListener('click',()=>{mesGanho=meses[i+1];render();});
+  const pills=el('div',{class:'chips'},janela.map(m=>{const b=el('button',{type:'button',class:'mes'+(m===mesGanho?' ponta':''),text:NOMES[+m.slice(5)-1]+(m.slice(0,4)!==mesGanho.slice(0,4)?'/'+m.slice(2,4):'')});b.addEventListener('click',()=>{mesGanho=m;render();});return b;}));
+  pg.append(el('div',{class:'mes-nav'},[ant,pills,prox]));
+  const d=DADOS.meses[mesGanho], p=pago(mesGanho), pr=prog[mesGanho]||0, titulo=NOMES_L[+mesGanho.slice(5)-1]+' de '+mesGanho.slice(0,4);
+  const bruto=(d?d[0]:0)+(progBruto[mesGanho]||0), taxa=(d?r2(d[0]-d[1]):0)+(progTaxa[mesGanho]||0), ajustes=r2(RES.filter(r=>r.status==='programada'&&r.tipo==='ajuste'&&r.pagamento.slice(0,7)===mesGanho).reduce((s,r)=>s+r.liquido,0));
+  const oc=nm[mesGanho]||0;
+  pg.append(cartao(titulo.charAt(0).toUpperCase()+titulo.slice(1),[el('div',{class:'linhas'},[
+    linha('Pago',brl(p),COR.liquido),linha('Programado',brl(pr),'#cfdccf'),el('div',{class:'linha total-g'},[el('span',{class:'n',text:'Total (BRL)'}),el('span',{text:brl(r2(p+pr))})])]),
+    acord('Detalhamento dos pagamentos',[el('div',{class:'linhas'},[linha('Ganhos brutos',brl(r2(bruto))),linha('Ajustes',brl(ajustes)),linha('Taxa de serviço',brl(-r2(taxa))),linha('Total',brl(r2(p+pr)))])]),
+    acord('Taxa de ocupação',[el('div',{class:'linhas'},[linha('Noites ocupadas',num(oc),null,'de '+diasNoMes(mesGanho)+' dias'),linha('Ocupação',pct(oc/diasNoMes(mesGanho)))]),
+      el('p',{class:'suave',text:'Calculada pelas datas das estadias, sobre os dias corridos do mês. O Airbnb desconta as datas bloqueadas, por isso o percentual dele pode ser maior.'})])]));
 };
 PG.resultado=pg=>{
   const cascata=el('div',{class:'cascata'}), porCat=el('div',{class:'rank'}), lista=el('div',{class:'lanc'}), situacao=el('p',{class:'suave'});

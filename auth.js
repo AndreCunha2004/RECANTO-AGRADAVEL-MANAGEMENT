@@ -70,10 +70,11 @@
         pdf: { bruto: Number(r.pdf_bruto), taxa: Number(r.pdf_taxa), liquido: Number(r.pdf_liquido) }
       };
     });
-    const futuras = f.data.map(r => ({ pagamento: r.pagamento, tipo: r.tipo, entrada: r.entrada, saida: r.saida, noites: r.noites,
-      bruto: Number(r.bruto), taxa: Number(r.taxa), limpeza: Number(r.limpeza), pet: Number(r.pet), liquido: Number(r.liquido) }));
+    const reservas = f.data.map(r => ({ codigo: r.codigo, tipo: r.tipo, status: r.status, hospede: r.hospede, data_reserva: r.data_reserva,
+      entrada: r.entrada, saida: r.saida, noites: r.noites, bruto: Number(r.bruto), taxa: Number(r.taxa), limpeza: Number(r.limpeza),
+      pet: Number(r.pet), liquido: Number(r.liquido), pagamento: r.pagamento, descricao: r.descricao }));
     const cfgDb = Object.fromEntries(c.data.map(r => [r.chave, r.valor]));
-    return { meses, anos, futuras, atualizado: cfgDb.atualizado || '' };
+    return { meses, anos, reservas, atualizado: cfgDb.atualizado || '' };
   }
 
   // Ponte com o formato que o painel já usa para lançamentos (custos e reservas) e anexos.
