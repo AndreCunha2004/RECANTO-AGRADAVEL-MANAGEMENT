@@ -22,10 +22,23 @@ create table if not exists public.meses (
 create table if not exists public.anos (
   ano int primary key,
   ini text not null, fim text not null, rotulo text not null,
-  dias int not null, noites int not null,
-  media_estadia numeric not null, imposto_hospede numeric not null, outros numeric not null,
+  dias int not null, noites int,
+  media_estadia numeric, imposto_hospede numeric, imposto_rotulo text, outros numeric not null default 0,
   pdf_bruto numeric not null, pdf_taxa numeric not null, pdf_liquido numeric not null
 );
+
+-- Reservas e ajustes programados no Airbnb (sem nomes de hóspedes nem códigos de reserva)
+create table if not exists public.reservas_airbnb (
+  id uuid primary key default gen_random_uuid(),
+  pagamento date not null,
+  tipo text not null check (tipo in ('reserva','ajuste')),
+  entrada date not null, saida date not null,
+  noites int not null default 0,
+  bruto numeric not null, taxa numeric not null default 0, limpeza numeric not null default 0, pet numeric not null default 0,
+  liquido numeric not null
+);
+-- Informações gerais (ex.: data da última atualização)
+create table if not exists public.config (chave text primary key, valor text not null);
 
 -- 3. Lançamentos feitos no painel
 create table if not exists public.custos (
@@ -57,15 +70,19 @@ revoke all on all tables in schema public from anon;
 alter table public.usuarios_permitidos enable row level security;
 alter table public.meses enable row level security;
 alter table public.anos enable row level security;
+alter table public.reservas_airbnb enable row level security;
+alter table public.config enable row level security;
 alter table public.custos enable row level security;
 alter table public.reservas enable row level security;
 
 create policy membros_leem_lista on public.usuarios_permitidos for select to authenticated using (public.eh_membro());
 create policy membros_tudo on public.meses for all to authenticated using (public.eh_membro()) with check (public.eh_membro());
 create policy membros_tudo on public.anos for all to authenticated using (public.eh_membro()) with check (public.eh_membro());
+create policy membros_tudo on public.reservas_airbnb for all to authenticated using (public.eh_membro()) with check (public.eh_membro());
+create policy membros_tudo on public.config for all to authenticated using (public.eh_membro()) with check (public.eh_membro());
 create policy membros_tudo on public.custos for all to authenticated using (public.eh_membro()) with check (public.eh_membro());
 create policy membros_tudo on public.reservas for all to authenticated using (public.eh_membro()) with check (public.eh_membro());
-grant select, insert, update, delete on public.meses, public.anos, public.custos, public.reservas to authenticated;
+grant select, insert, update, delete on public.meses, public.anos, public.reservas_airbnb, public.config, public.custos, public.reservas to authenticated;
 grant select on public.usuarios_permitidos to authenticated;
 
 -- 5. Anexos: bucket privado, 20 MB, só PDF e imagens

@@ -90,13 +90,17 @@ const SECOES=[
   {id:'dinamica',nome:'Tabela dinâmica',fim:true,ico:'<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 10h18M10 10v10"/>'},
   {id:'taxas',nome:'Taxas Airbnb',filtro:true,ico:'<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>'},
   {id:'ocupacao',nome:'Ocupação',ico:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'},
-  {id:'reservas',nome:'Reservas',breve:true,fim:true,ico:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'},
+  {id:'reservas',nome:'Reservas',fim:true,ico:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'},
   {id:'resultado',nome:'Custos e lucro',curto:'Custos',filtro:true,barra:true,ico:'<path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h10"/><path d="M16 13.5h.01"/>'},
   {id:'sobre',nome:'Sobre os dados',rodape:true,ico:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>'}
 ];
 const icone=s=>el('span',{html:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">'+s+'</svg>',style:'display:inline-flex'});
 let pagina='visao', de='2026-01', ate='2026-11', mesSel=TODOS[TODOS.length-1], metrica='bruto', pend=null, anoRank=ANOS[ANOS.length-1];
 let pv={linhas:'mes',valor:'bruto',como:'valor',ord:null};
+let comp=[ANOS[ANOS.length-2],ANOS[ANOS.length-1]];
+function seletorComp(){const mk=(i,rotulo)=>{const s=el('select',{'aria-label':rotulo});ANOS.forEach(x=>{const o=el('option',{value:x,text:x});if(x===comp[i])o.selected=true;s.append(o);});
+  s.addEventListener('change',()=>{const v=s.value,o=comp[1-i];comp[i]=v;if(v===o)comp[1-i]=ANOS.find(x=>x!==v);comp.sort();render();});return s;};
+  return el('div',{class:'comp-anos'},[el('span',{text:'Comparar'}),mk(0,'Primeiro ano'),el('span',{text:'com'}),mk(1,'Segundo ano')]);}
 
 /* ---------- custos (guardados junto com o painel publicado) ---------- */
 const CATEGORIAS=['Limpeza','Luz','Água','Internet','Piscina','Manutenção','IPTU','Reposição','Outros'];
@@ -150,7 +154,7 @@ const PG={};
 PG.visao=pg=>{
   const meses=listaMeses(de,ate).filter(m=>DADOS.meses[m]), t=soma(meses), A=anoExato(de,ate);
   const k=el('div',{class:'kpis'},[kpi('Receita bruta',brl(t.bruto)),kpi('Taxa Airbnb',brl(t.taxa),t.aliq==null?'':pct(t.aliq)+' da bruta'),kpi('Receita líquida',brl(t.liquido))]);
-  if(A){k.append(kpi('Noites',num(A.noites),'reservadas'),kpi('Ocupação',pct(A.noites/A.dias),'dias corridos'),kpi('Diária média',brl((A.pdf.bruto-A.outros)/A.noites)));}
+  if(A&&A.noites){k.append(kpi('Noites',num(A.noites),'reservadas'),kpi('Ocupação',pct(A.noites/A.dias),'dias corridos'),kpi('Diária média',brl((A.pdf.bruto-A.outros)/A.noites)));}
   pg.append(k);
   if(t.bruto>0) pg.append(cartao('Receita bruta do período',[rosca([{nome:'Receita líquida',valor:t.liquido,cor:COR.liquido},{nome:'Taxa Airbnb',valor:t.taxa,cor:COR.taxa}],brl(t.bruto),'bruta',brl)]));
   if(!meses.length){pg.append(el('p',{class:'suave',text:'Sem dados do Airbnb neste período.'}));return;}
@@ -178,7 +182,7 @@ PG.mes=pg=>{
   const corpo=[];
   if(d[0]>0) corpo.push(rosca([{nome:'Receita líquida',valor:d[1],cor:COR.liquido},{nome:'Taxa Airbnb',valor:tx,cor:COR.taxa}],brl(d[0]),'bruta',brl));
   else corpo.push(el('p',{class:'suave',text:'Sem receita neste mês.'}));
-  const totalAno=soma(mesesAno).bruto, outroAno=ANOS.find(a=>a!==ano), mesOutro=outroAno+mesSel.slice(4), dO=DADOS.meses[mesOutro];
+  const totalAno=soma(mesesAno).bruto, outroAno=String(+ano-1), mesOutro=outroAno+mesSel.slice(4), dO=DADOS.meses[mesOutro];
   corpo.push(el('div',{class:'linhas'},[
     linha('Participação na receita bruta de '+ano,totalAno?pct(d[0]/totalAno):'—'),
     dO?linha('Receita bruta em '+rot(mesOutro),brl(dO[0]),null,dO[0]?varia(dO[0],d[0])+' em '+ano:''):null]));
@@ -195,36 +199,37 @@ PG.mes=pg=>{
 PG.comparativo=pg=>{
   pg.append(seg([['bruto','Bruta'],['liquido','Líquida'],['taxa','Taxa']],metrica==='aliq'?'bruto':metrica,v=>{metrica=v;render();},'Métrica'));
   if(metrica==='aliq')metrica='bruto';
+  pg.append(seletorComp());
   const nome=NOME_METRICA[metrica];
-  const series=ANOS.map(a=>NOMES.map((_,i)=>valor(ym2(a,i+1),metrica)));
-  const g1=areaGrafico(nome+' por mês, '+ANOS.join(' e '));
+  const series=comp.map(a=>NOMES.map((_,i)=>valor(ym2(a,i+1),metrica)));
+  const g1=areaGrafico(nome+' por mês, '+comp.join(' e '));
   pg.append(cartao(nome+' por mês',[g1.caixa]));
-  desenha(g1.cv,{type:'bar',data:{labels:NOMES,datasets:ANOS.map((a,i)=>({label:a,data:series[i],backgroundColor:COR.anos[i],borderRadius:3,maxBarThickness:14,categoryPercentage:.7,barPercentage:.86}))},
+  desenha(g1.cv,{type:'bar',data:{labels:NOMES,datasets:comp.map((a,i)=>({label:a,data:series[i],backgroundColor:COR.anos[i],borderRadius:3,maxBarThickness:14,categoryPercentage:.7,barPercentage:.86}))},
     options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:escalas(eixoR),plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(series[c.datasetIndex][c.dataIndex])}}}}});
 
   // ponte: do total de um ano ao total do outro, no mesmo período
-  const fim=+DADOS.anos[ANOS[1]].fim.slice(5), idx=Array.from({length:fim},(_,i)=>i);
+  const fim=+DADOS.anos[comp[1]].fim.slice(5), idx=Array.from({length:fim},(_,i)=>i);
   const a=idx.map(i=>series[0][i]||0), b=idx.map(i=>series[1][i]||0), ini=r2(a.reduce((s,v)=>s+v,0)), fimTot=r2(b.reduce((s,v)=>s+v,0));
   let cur=ini; const barras=[[0,ini]], deltas=[null], cores=[COR.anos[0]];
   idx.forEach(i=>{const dlt=r2(b[i]-a[i]);barras.push([cur,r2(cur+dlt)]);deltas.push(dlt);cores.push(dlt>=0?COR.sobe:COR.desce);cur=r2(cur+dlt);});
   barras.push([0,fimTot]);deltas.push(null);cores.push(COR.anos[1]);
-  const rotulos=[ANOS[0]].concat(idx.map(i=>NOMES[i]),[ANOS[1]]);
-  const g3=areaGrafico('Ponte de '+nome.toLowerCase()+' de '+ANOS[0]+' para '+ANOS[1]+', mês a mês');
-  pg.append(cartao('De '+ANOS[0]+' para '+ANOS[1]+', mês a mês',[g3.caixa,legenda([[COR.sobe,'Aumento'],[COR.desce,'Queda']])]));
+  const rotulos=[comp[0]].concat(idx.map(i=>NOMES[i]),[comp[1]]);
+  const g3=areaGrafico('Ponte de '+nome.toLowerCase()+' de '+comp[0]+' para '+comp[1]+', mês a mês');
+  pg.append(cartao('De '+comp[0]+' para '+comp[1]+', mês a mês',[g3.caixa,legenda([[COR.sobe,'Aumento'],[COR.desce,'Queda']])]));
   desenha(g3.cv,{type:'bar',data:{labels:rotulos,datasets:[{label:nome,data:barras,backgroundColor:cores,borderRadius:3,borderSkipped:false,maxBarThickness:30}]},
     options:{maintainAspectRatio:false,scales:escalas(eixoR),plugins:{legend:{display:false},tooltip:{callbacks:{
       title:its=>{const k=its[0].dataIndex;return deltas[k]==null?'Total de janeiro a '+NOMES_L[fim-1]+' de '+rotulos[k]:NOMES_L[k-1];},
       label:c=>{const dlt=deltas[c.dataIndex];return dlt==null?brl(barras[c.dataIndex][1]):(dlt>=0?'+':'−')+brl(Math.abs(dlt)).replace('-','');},
-      footer:its=>{const k=its[0].dataIndex;return deltas[k]==null?'':ANOS[0]+': '+brl(a[k-1])+'  ·  '+ANOS[1]+': '+brl(b[k-1]);}}}}}});
+      footer:its=>{const k=its[0].dataIndex;return deltas[k]==null?'':comp[0]+': '+brl(a[k-1])+'  ·  '+comp[1]+': '+brl(b[k-1]);}}}}}});
 
   const acum=series.map(s=>{let t=0;return s.map(v=>v==null?null:r2(t+=v));});
   const g2=areaGrafico(nome+' acumulada no ano');
   pg.append(cartao('Acumulado no ano',[g2.caixa]));
-  desenha(g2.cv,{type:'line',data:{labels:NOMES,datasets:ANOS.map((an,i)=>({label:an,data:acum[i],borderColor:COR.anos[i],backgroundColor:COR.anos[i],borderWidth:2,pointRadius:3,pointHoverRadius:5,pointBorderColor:'#fff',pointBorderWidth:1.5,tension:.15}))},
+  desenha(g2.cv,{type:'line',data:{labels:NOMES,datasets:comp.map((an,i)=>({label:an,data:acum[i],borderColor:COR.anos[i],backgroundColor:COR.anos[i],borderWidth:2,pointRadius:3,pointHoverRadius:5,pointBorderColor:'#fff',pointBorderWidth:1.5,tension:.15}))},
     options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:escalas(eixoR),plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(acum[c.datasetIndex][c.dataIndex])}}}}});
 
-  const fimS=String(fim).padStart(2,'0'), sa=soma(listaMeses(ANOS[0]+'-01',ANOS[0]+'-'+fimS)), sb=soma(listaMeses(ANOS[1]+'-01',ANOS[1]+'-'+fimS));
-  pg.append(cartao('Janeiro a '+NOMES_L[fim-1],[tabela(['',ANOS[0],ANOS[1],'Variação'],[
+  const fimS=String(fim).padStart(2,'0'), sa=soma(listaMeses(comp[0]+'-01',comp[0]+'-'+fimS)), sb=soma(listaMeses(comp[1]+'-01',comp[1]+'-'+fimS));
+  pg.append(cartao('Janeiro a '+NOMES_L[fim-1],[tabela(['',comp[0],comp[1],'Variação'],[
     ['Receita bruta',brl(sa.bruto),brl(sb.bruto),varia(sa.bruto,sb.bruto)],
     ['Taxa Airbnb',brl(sa.taxa),brl(sb.taxa),varia(sa.taxa,sb.taxa)],
     ['Taxa efetiva',pct(sa.aliq),pct(sb.aliq),'—'],
@@ -266,24 +271,25 @@ PG.sazonalidade=pg=>{
 PG.dinamica=pg=>{
   const GRUPOS={mes:NOMES.map((n,i)=>[n,[i+1]]),tri:[1,2,3,4].map(q=>[q+'º tri',[q*3-2,q*3-1,q*3]]),sem:[['1º sem',[1,2,3,4,5,6]],['2º sem',[7,8,9,10,11,12]]]};
   const cel=(ano,ms)=>{const com=ms.filter(m=>DADOS.meses[ym2(ano,m)]);if(!com.length)return null;const s=soma(com.map(m=>ym2(ano,m)));s.meses=com.join(',');return s;};
-  const tot=ANOS.map(a=>cel(a,[1,2,3,4,5,6,7,8,9,10,11,12]));
+  const tot=comp.map(a=>cel(a,[1,2,3,4,5,6,7,8,9,10,11,12]));
   const ehTaxa=pv.valor==='aliq', emPct=pv.como==='pct'&&!ehTaxa;
   const val=(c,k)=>c==null?null:(emPct?(tot[k][pv.valor]?c[pv.valor]/tot[k][pv.valor]:null):c[pv.valor]);
   const fmt=v=>v==null?'—':(ehTaxa||emPct?pct(v):brl(v));
   const variacao=(x,y)=>{if(!x||!y||x.meses!==y.meses)return [null,'—'];
     if(ehTaxa){if(x.aliq==null||y.aliq==null)return [null,'—'];const d=(y.aliq-x.aliq)*100;return [d,(d>=0?'+':'−')+num(Math.abs(d),1)+' p.p.'];}
     const p=x[pv.valor],q=y[pv.valor];if(!p)return [null,'—'];return [(q-p)/p,varia(p,q)];};
-  let linhas=GRUPOS[pv.linhas].map(([n,ms],i)=>{const cs=ANOS.map(a=>cel(a,ms)), vr=variacao(cs[0],cs[1]);return {i,n,v:cs.map((c,k)=>val(c,k)),vr};});
+  let linhas=GRUPOS[pv.linhas].map(([n,ms],i)=>{const cs=comp.map(a=>cel(a,ms)), vr=variacao(cs[0],cs[1]);return {i,n,v:cs.map((c,k)=>val(c,k)),vr};});
   if(pv.ord){const {col,dir}=pv.ord, pega=l=>col===2?l.vr[0]:l.v[col];
     linhas=linhas.slice().sort((x,y)=>{const p=pega(x),q=pega(y);if(p==null&&q==null)return 0;if(p==null)return 1;if(q==null)return -1;return dir==='desc'?q-p:p-q;});}
-  const maximos=ANOS.map((_,k)=>Math.max(0,...linhas.map(l=>l.v[k]||0)));
+  const maximos=comp.map((_,k)=>Math.max(0,...linhas.map(l=>l.v[k]||0)));
 
+  pg.append(seletorComp());
   pg.append(el('div',{class:'controles'},[
     seg([['mes','Mês'],['tri','Trimestre'],['sem','Semestre']],pv.linhas,v=>{pv.linhas=v;render();},'Linhas'),
     seg([['bruto','Bruta'],['liquido','Líquida'],['taxa','Taxa'],['aliq','Taxa efetiva']],pv.valor,v=>{pv.valor=v;render();},'Valor'),
     seg([['valor','Valor'],['pct','% do ano']],emPct?'pct':'valor',v=>{pv.como=v;render();},'Exibição')]));
 
-  const t=el('table',{class:'din'}), cabs=[{t:pv.linhas==='mes'?'Mês':pv.linhas==='tri'?'Trimestre':'Semestre',col:null}].concat(ANOS.map((a,k)=>({t:a,col:k})),[{t:'Variação',col:2}]);
+  const t=el('table',{class:'din'}), cabs=[{t:pv.linhas==='mes'?'Mês':pv.linhas==='tri'?'Trimestre':'Semestre',col:null}].concat(comp.map((a,k)=>({t:a,col:k})),[{t:'Variação',col:2}]);
   t.append(el('thead',{},el('tr',{},cabs.map(c=>{const ativo=pv.ord&&pv.ord.col===c.col&&c.col!=null;
     const b=el('button',{type:'button',text:c.t+(ativo?(pv.ord.dir==='desc'?' ↓':' ↑'):''),'aria-label':c.col==null?'Voltar à ordem original':'Ordenar por '+c.t});
     b.addEventListener('click',()=>{ if(c.col==null)pv.ord=null; else if(!ativo)pv.ord={col:c.col,dir:'desc'}; else if(pv.ord.dir==='desc')pv.ord={col:c.col,dir:'asc'}; else pv.ord=null; render(); });
@@ -334,11 +340,11 @@ PG.taxas=pg=>{
     saida.append(el('p',{class:'suave',text:'Na taxa dividida, o hóspede pagava entre '+brl(p*1.141)+' e '+brl(p*1.165)+' por um preço de '+brl(p)+'. Novo preço = preço antigo × (1 − taxa antiga) ÷ (1 − taxa nova).'}));};
   inp.addEventListener('input',calc);calc();
   pg.append(acord('Preço de equilíbrio',[el('label',{for:'precoAntigo',class:'suave',style:'display:flex;flex-direction:column;gap:4px'},[document.createTextNode('Preço cobrado antes da mudança (R$)'),inp]),saida]));
-  pg.append(acord('Impostos cobrados dos hóspedes',[tabela(['Período','Repassado pelo Airbnb'],ANOS.map(a=>[DADOS.anos[a].rotulo,brl(DADOS.anos[a].impostoHospede)])),
+  pg.append(acord('Impostos cobrados dos hóspedes',[tabela(['Período','Repassado pelo Airbnb'],ANOS.filter(a=>DADOS.anos[a].impostoHospede!=null).map(a=>[DADOS.anos[a].impostoRotulo||DADOS.anos[a].rotulo,brl(DADOS.anos[a].impostoHospede)])),
     el('p',{class:'suave',text:'Cobrado do hóspede e repassado pelo Airbnb às autoridades. Não passa pela conta do anfitrião.'})]));
 };
 PG.ocupacao=pg=>{
-  const as=ANOS.map(a=>DADOS.anos[a]), acom=A=>A.pdf.bruto-A.outros;
+  const as=ANOS.map(a=>DADOS.anos[a]).filter(A=>A.noites), acom=A=>A.pdf.bruto-A.outros;
   pg.append(el('div',{class:'duas'},as.map(A=>cartao(A.rotulo,[rosca([{nome:'Noites reservadas',valor:A.noites,cor:COR.marca},{nome:'Dias sem reserva',valor:A.dias-A.noites,cor:COR.apagado}],pct(A.noites/A.dias),'ocupação',v=>num(v))]))));
   pg.append(cartao('Indicadores',[tabela([''].concat(as.map(A=>A.rotulo)),[
     ['Noites reservadas'].concat(as.map(A=>num(A.noites))),
@@ -350,7 +356,24 @@ PG.ocupacao=pg=>{
   pg.append(el('p',{class:'suave',text:'A ocupação por mês aparece quando o calendário do Airbnb for importado.'}));
 };
 PG.reservas=pg=>{
-  pg.append(cartao('Em breve',[el('p',{class:'suave',text:'Lista de estadias, valores por reserva e datas de pagamento, a partir do histórico de transações do Airbnb.'})]));
+  const F=(DADOS.futuras||[]).slice().sort((x,y)=>x.pagamento.localeCompare(y.pagamento)), R=F.filter(f=>f.tipo==='reserva');
+  if(!F.length){pg.append(el('p',{class:'suave',text:'Nenhuma reserva programada.'}));return;}
+  const s=k=>r2(R.reduce((t,f)=>t+f[k],0)), noites=R.reduce((t,f)=>t+f.noites,0), liq=r2(F.reduce((t,f)=>t+f.liquido,0)), bru=s('bruto'), tx=s('taxa');
+  const diaria=noites?r2((bru-s('limpeza')-s('pet'))/noites):null;
+  pg.append(el('div',{class:'kpis'},[kpi('Reservas',num(R.length),'confirmadas'),kpi('Noites',num(noites),'reservadas'),kpi('Diária média',brl(diaria),'sem limpeza'),
+    kpi('Receita bruta',brl(bru)),kpi('Taxa Airbnb',brl(tx),bru?pct(tx/bru)+' da bruta':''),kpi('A receber',brl(liq),'líquido programado')]));
+  const meses=[...new Set(F.map(f=>f.pagamento.slice(0,7)))].sort(), porMes=meses.map(m=>r2(F.filter(f=>f.pagamento.slice(0,7)===m).reduce((t,f)=>t+f.liquido,0)));
+  const g=areaGrafico('Valor programado por mês de pagamento');
+  pg.append(cartao('A receber por mês',[g.caixa]));
+  desenha(g.cv,{type:'bar',data:{labels:meses.map(rot),datasets:[{label:'A receber',data:porMes,backgroundColor:COR.liquido,borderRadius:4,maxBarThickness:36}]},
+    options:{maintainAspectRatio:false,scales:escalas(eixoR),plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>brl(porMes[c.dataIndex])}}}}});
+  const lista=el('div',{class:'lanc'});
+  F.forEach(f=>{const aj=f.tipo!=='reserva';
+    const sub=aj?'Estadia de '+dataBR(f.entrada)+' a '+dataBR(f.saida)+' · desconto no pagamento de '+dataBR(f.pagamento)
+      :[f.noites+(f.noites===1?' noite':' noites')+' até '+dataBR(f.saida),'bruta '+brl(f.bruto),'taxa '+brl(f.taxa)+' ('+pct(f.bruto?f.taxa/f.bruto:null)+')',f.limpeza?'limpeza '+brl(f.limpeza):'',f.pet?'pet '+brl(f.pet):'','pagamento '+dataBR(f.pagamento)].filter(Boolean).join(' · ');
+    lista.append(el('div',{class:'lc'},[el('span',{class:'quando',text:dataBR(aj?f.pagamento:f.entrada)}),el('div',{class:'oque'},[el('b',{text:aj?'Ajuste de resolução':'Reserva Airbnb'}),el('span',{text:sub})]),el('span',{class:'quanto',text:brl(f.liquido)})]));});
+  pg.append(cartao('Próximas estadias',[lista]));
+  pg.append(el('p',{class:'suave',text:'Atualizado em '+DADOS.atualizado+'.'}));
 };
 PG.resultado=pg=>{
   const cascata=el('div',{class:'cascata'}), porCat=el('div',{class:'rank'}), lista=el('div',{class:'lanc'}), situacao=el('p',{class:'suave'});
@@ -441,7 +464,7 @@ PG.resultado=pg=>{
   pintaCustos();
 };
 PG.sobre=pg=>{
-  pg.append(el('p',{class:'suave',text:'Números dos relatórios de ganhos do Airbnb, de 01/01/2025 a 14/11/2026.'}));
+  pg.append(el('p',{class:'suave',text:'Números dos relatórios de ganhos do Airbnb, de 01/12/2021 a '+DADOS.atualizado+'.'}));
   const conf=[];ANOS.forEach(a=>{const A=DADOS.anos[a],t=soma(listaMeses(A.ini,A.fim));
     [['bruto','bruta'],['taxa','taxa'],['liquido','líquida']].forEach(([k,n])=>conf.push([a+', '+n,brl(t[k]),brl(A.pdf[k]),brl(r2(t[k]-A.pdf[k]))]));});
   pg.append(acord('Conferência com o relatório do Airbnb',[tabela(['','Painel','Relatório','Diferença'],conf)]));
@@ -454,7 +477,7 @@ PG.sobre=pg=>{
     'O mês de cada valor é o informado pelo relatório do Airbnb.'].map(t=>el('li',{text:t})))]));
   pg.append(acord('Como o Airbnb cobra a taxa',[el('p',{class:'suave',text:'Na taxa única, o Airbnb desconta 16% do anfitrião no Brasil e o hóspede não paga taxa de serviço à parte. No modelo anterior, o anfitrião pagava 4% e o hóspede de 14,1% a 16,5%.'}),
     el('p',{class:'suave'},[el('a',{href:'https://www.airbnb.com.br/help/article/1857',rel:'noopener noreferrer',text:'Central de Ajuda do Airbnb: taxas de serviço'})])]));
-  pg.append(acord('Onde ficam os lançamentos',[el('p',{class:'suave',text:'Os custos, as reservas por fora e os anexos ficam guardados junto com este painel. Só quem tem permissão de edição consegue lançar ou excluir.'})]));
+  pg.append(acord('Onde ficam os lançamentos',[el('p',{class:'suave',text:'Os dados, os lançamentos e os anexos ficam num banco protegido por login. Só os e-mails autorizados conseguem ver, lançar ou excluir.'})]));
 };
 
 /* ---------- período ---------- */

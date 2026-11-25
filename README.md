@@ -6,7 +6,7 @@ O site é estático (HTML, CSS e JavaScript, com Chart.js e a biblioteca do Supa
 
 ## Estrutura
 - `index.html`, `estilo.css`, `app.js`: interface do painel
-- `auth.js`: login e carga dos dados
+- `auth.js`: login e carga dos dados (totais, reservas programadas e lançamentos)
 - `config.js`: endereço do projeto e chave pública
 - `supabase/schema.sql`: tabelas e regras de acesso
 - `.github/workflows/manter-ativo.yml`: consulta semanal que mantém o banco ativo

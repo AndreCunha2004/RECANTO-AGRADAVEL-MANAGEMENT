@@ -50,24 +50,30 @@
     email.focus();
   }
 
+  const nn = v => v == null ? null : Number(v);
   async function carregaDados() {
-    const [m, a] = await Promise.all([
+    const [m, a, f, c] = await Promise.all([
       sb.from('meses').select('ym,bruto,liquido').order('ym'),
-      sb.from('anos').select('*').order('ano')
+      sb.from('anos').select('*').order('ano'),
+      sb.from('reservas_airbnb').select('*').order('pagamento'),
+      sb.from('config').select('chave,valor')
     ]);
-    if (m.error || a.error) return null;
+    if (m.error || a.error || f.error || c.error) return null;
     if (!m.data.length || !a.data.length) return { vazio: true };
     const meses = {};
     m.data.forEach(r => { meses[r.ym] = [Number(r.bruto), Number(r.liquido)]; });
     const anos = {};
     a.data.forEach(r => {
       anos[r.ano] = {
-        ini: r.ini, fim: r.fim, rotulo: r.rotulo, dias: r.dias, noites: r.noites,
-        mediaEstadia: Number(r.media_estadia), impostoHospede: Number(r.imposto_hospede), outros: Number(r.outros),
+        ini: r.ini, fim: r.fim, rotulo: r.rotulo, dias: r.dias, noites: r.noites == null ? null : Number(r.noites),
+        mediaEstadia: nn(r.media_estadia), impostoHospede: nn(r.imposto_hospede), impostoRotulo: r.imposto_rotulo, outros: Number(r.outros),
         pdf: { bruto: Number(r.pdf_bruto), taxa: Number(r.pdf_taxa), liquido: Number(r.pdf_liquido) }
       };
     });
-    return { meses, anos };
+    const futuras = f.data.map(r => ({ pagamento: r.pagamento, tipo: r.tipo, entrada: r.entrada, saida: r.saida, noites: r.noites,
+      bruto: Number(r.bruto), taxa: Number(r.taxa), limpeza: Number(r.limpeza), pet: Number(r.pet), liquido: Number(r.liquido) }));
+    const cfgDb = Object.fromEntries(c.data.map(r => [r.chave, r.valor]));
+    return { meses, anos, futuras, atualizado: cfgDb.atualizado || '' };
   }
 
   // Ponte com o formato que o painel já usa para lançamentos (custos e reservas) e anexos.

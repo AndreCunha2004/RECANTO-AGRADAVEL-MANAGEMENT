@@ -256,6 +256,8 @@ main,#pagina,.cartao,.grafico,.duas>*{min-width:0}
   .lc .quando{grid-column:1/-1}
   .lc .acoes{grid-column:1/-1}
 }
+.comp-anos{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;font-size:14px;color:var(--tinta-2)}
+.comp-anos select{font:inherit;font-size:15px;color:var(--tinta);padding:7px 10px;border:1px solid var(--areia-3);border-radius:10px;background:#fff}
 
 /* Entrada (login) */
 .entrada{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--areia-1);padding:20px}
