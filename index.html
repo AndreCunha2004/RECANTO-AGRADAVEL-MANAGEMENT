@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://bvralcbsvnzioqdqlxwd.supabase.co; font-src 'self'; connect-src 'self' https://bvralcbsvnzioqdqlxwd.supabase.co wss://bvralcbsvnzioqdqlxwd.supabase.co; base-uri 'none'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Painel Recanto Agradável</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="lateral" id="lateral" aria-label="Menu do painel">
+    <div class="marca">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><path d="M6 24C6 12 13 5 25 5c0 12-7 19-19 19z"/><path d="M6 24L18 12"/></svg>
+      <div><strong>Recanto Agradável</strong><span>Painel de gestão</span></div>
+    </div>
+    <nav id="menu" aria-label="Seções"></nav>
+    <div class="rodape" id="rodape"><span class="ate">Dados do Airbnb até 14/11/2026</span><button type="button" class="btn-sair" id="btnSair" hidden>Sair</button></div>
+  </aside>
+  <div class="veu" id="veu"></div>
+  <main>
+    <div class="barra-app">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><path d="M6 24C6 12 13 5 25 5c0 12-7 19-19 19z"/><path d="M6 24L18 12"/></svg>
+      <strong>Recanto Agradável</strong>
+    </div>
+    <header class="topo">
+      <button type="button" id="btnMenu" aria-label="Abrir ou fechar o menu" aria-controls="lateral"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div class="titulos"><span class="marca-topo">Recanto Agradável</span><h1 id="titulo">Visão geral</h1></div>
+    </header>
+    <div class="periodo" id="periodo">
+      <div class="periodo-ancora">
+        <button type="button" id="btnPeriodo" aria-haspopup="dialog" aria-expanded="false">Período</button>
+        <div class="pop" id="popPeriodo" role="dialog" aria-label="Escolher período" hidden></div>
+      </div>
+      <button type="button" class="atalho" data-atalho="2025">2025</button>
+      <button type="button" class="atalho" data-atalho="2026">2026</button>
+      <button type="button" class="atalho" data-atalho="tudo">Tudo</button>
+    </div>
+    <div id="pagina"></div>
+  </main>
+  <nav class="tabbar" id="tabbar" aria-label="Navegação rápida"></nav>
+</div>
+<div class="dica" id="dica" hidden></div>
+
+
+<script src="vendor/chart.umd.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+</body>
+</html>
