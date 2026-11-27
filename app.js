@@ -4,8 +4,16 @@ const NOMES_L=['janeiro','fevereiro','março','abril','maio','junho','julho','ag
 const ANOS=Object.keys(DADOS.anos);
 const TODOS=Object.keys(DADOS.meses).sort();
 // Cores dos dados (significado fixo; ver DESIGN.md)
-const COR={liquido:'#4f6b57',taxa:'#b9767f',anos:['#b5a17c','#4f6b57'],sobe:'#4f6b57',desce:'#b9767f',marca:'#8a7250',apagado:'#d9cdb6',
-  grade:'#f1eadf',tinta:'#2b2926',tinta2:'#7a746b',calor:['#f3ecdf','#e0dcc4','#b3bfa4','#5e7a64','#3f5a47']};
+const CORES={
+  claro:{liquido:'#4f6b57',taxa:'#b9767f',anos:['#b5a17c','#4f6b57'],sobe:'#4f6b57',desce:'#b9767f',marca:'#8a7250',apagado:'#d9cdb6',
+    grade:'#f1eadf',tinta:'#2b2926',tinta2:'#7a746b',calor:['#f3ecdf','#e0dcc4','#b3bfa4','#5e7a64','#3f5a47'],calorTexto:'#ffffff',
+    fundo:'#ffffff',dicaFundo:'#faf7f1',dicaBorda:'#e2d8c6',programado:'#cfdccf',pagoOutros:'#7f9886',programadoFundo:'#e3ece3',fora:'#8fa694'},
+  escuro:{liquido:'#8fb39a',taxa:'#d39aa2',anos:['#c9b48c','#8fb39a'],sobe:'#8fb39a',desce:'#d39aa2',marca:'#c9ad85',apagado:'#4a443b',
+    grade:'#2d2924',tinta:'#efe9df',tinta2:'#a9a196',calor:['#2a2722','#36382e','#4c5c48','#77987f','#b4d0b9'],calorTexto:'#1c1a17',
+    fundo:'#1c1a17',dicaFundo:'#2d2924',dicaBorda:'#3d3830',programado:'#4d5e51',pagoOutros:'#62806b',programadoFundo:'#2c3a30',fora:'#7d9c85'}};
+const esquemaAtual=()=>document.documentElement.getAttribute('data-esquema')==='escuro'?'escuro':'claro';
+const COR=Object.assign({},CORES[esquemaAtual()]);
+function corTema(){Object.assign(COR,CORES[esquemaAtual()]);padroesOk=false;}
 const brl=v=>v==null||isNaN(v)?'sem dados':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=v=>v==null||isNaN(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
 const num=(v,d=0)=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -73,8 +81,8 @@ function desenha(cv,config){
   if(!padroesOk){padroesOk=true;const D=Chart.defaults;
     D.color=COR.tinta2;D.font.family="'IBM Plex Sans',system-ui,sans-serif";D.font.size=12;
     D.plugins.legend.labels.usePointStyle=true;D.plugins.legend.labels.boxHeight=7;D.plugins.legend.position='bottom';
-    const T=D.plugins.tooltip;T.backgroundColor='#faf7f1';T.titleColor=COR.tinta;T.bodyColor=COR.tinta;T.footerColor=COR.tinta2;
-    T.borderColor='#e2d8c6';T.borderWidth=1;T.padding=10;T.cornerRadius=10;T.usePointStyle=true;T.boxPadding=4;
+    const T=D.plugins.tooltip;T.backgroundColor=COR.dicaFundo;T.titleColor=COR.tinta;T.bodyColor=COR.tinta;T.footerColor=COR.tinta2;
+    T.borderColor=COR.dicaBorda;T.borderWidth=1;T.padding=10;T.cornerRadius=10;T.usePointStyle=true;T.boxPadding=4;
     T.titleFont={weight:'500'};T.footerFont={weight:'400'};
     if(matchMedia('(prefers-reduced-motion: reduce)').matches)D.animation=false;}
   graficos.push(new Chart(cv,config));
@@ -170,6 +178,18 @@ function textoErro(e){const c=e&&e.code;
 const dataBR=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
 const temDado=m=>!!DADOS.meses[m]||custos.some(c=>c.data.slice(0,7)===m)||reservasFora.some(c=>c.entrada.slice(0,7)===m);
 
+/* ---------- preferências do usuário (tema e ordem do Início) ---------- */
+function prefs(){
+  if(window.recantoPrefs)return window.recantoPrefs;
+  let o=[];try{o=JSON.parse(localStorage.getItem('recanto-ordem-inicio')||'[]');}catch(e){}
+  return {tema:window.recantoTemaLocal?recantoTemaLocal():'sistema',ordem_inicio:Array.isArray(o)?o:[]};
+}
+async function salvaPrefs(parcial){
+  if(window.recantoPrefs)window.recantoPrefs=Object.assign({},window.recantoPrefs,parcial);
+  if(window.recantoSalvaPrefs)return window.recantoSalvaPrefs(parcial);
+  try{if('ordem_inicio' in parcial)localStorage.setItem('recanto-ordem-inicio',JSON.stringify(parcial.ordem_inicio));}catch(e){}
+}
+
 /* ---------- notificações ----------
    Geradas aqui a partir das reservas, dos pagamentos e dos custos já carregados.
    O que já foi lido fica guardado neste aparelho. */
@@ -243,44 +263,51 @@ function repintaNotif(){atualizaSelo();if(!document.getElementById('notif').hidd
 
 /* ---------- seções ---------- */
 const PG={};
+const INICIO_PADRAO=['nacasa','chegadas','mes','atalhos','atual'];
 PG.inicio=pg=>{
   const h=new Date().getHours(), saud=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
   const reservas=RES.filter(r=>r.tipo==='reserva');
   const naCasa=reservas.filter(r=>r.entrada<=HOJE&&r.saida>HOJE).sort((x,y)=>x.saida.localeCompare(y.saida));
   const proximas=reservas.filter(r=>r.entrada>HOJE).sort((x,y)=>x.entrada.localeCompare(y.entrada));
-  pg.append(el('p',{class:'ini-saud',text:saud+'.'}),
+  pg.append(el('p',{id:'avisoOrdem',class:'so-leitor','aria-live':'polite'}),el('p',{class:'ini-saud',text:saud+'.'}),
     el('p',{class:'ini-sub',text:naCasa.length?'A casa está ocupada.':proximas.length?'A casa está livre. A próxima chegada é '+DIA_MES(proximas[0].entrada)+'.':'A casa está livre e não há reserva marcada.'}));
 
   const ini=r=>r.hospede?r.hospede.trim().split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase():String(+r.entrada.slice(8,10));
   const quem=r=>r.hospede||('Reserva de '+DIA_MES(r.entrada));
   const cartaoHosp=(r,rot)=>el('div',{class:'ini-agora'},[el('span',{class:'av','aria-hidden':'true',text:ini(r)}),
     el('span',{class:'qm'},[el('b',{text:quem(r)}),el('span',{text:rot})]),el('span',{class:'vl',text:brl(r.liquido)})]);
-  if(naCasa.length) pg.append(cartao('Na casa agora',naCasa.map(r=>cartaoHosp(r,'Sai '+DIA_MES(r.saida)+' · '+diasEntre(HOJE,r.saida)+(diasEntre(HOJE,r.saida)===1?' noite':' noites')+' restando'))));
-  if(proximas.length) pg.append(cartao('Próximas chegadas',proximas.slice(0,3).map(r=>{const d=diasEntre(HOJE,r.entrada);
-    return cartaoHosp(r,(d===0?'Chega hoje':d===1?'Chega amanhã':'Chega em '+d+' dias')+' · '+DIA_MES(r.entrada)+' a '+DIA_MES(r.saida));})));
+  const blocos={};
+  const ALCA='<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>';
+  const alca=nome=>el('button',{type:'button',class:'alca','aria-label':'Mover o bloco '+nome+': arraste para cima ou para baixo, ou use as setas'},[icone(ALCA)]);
+  if(naCasa.length) blocos.nacasa=cartao('Na casa agora',naCasa.map(r=>cartaoHosp(r,'Sai '+DIA_MES(r.saida)+' · '+diasEntre(HOJE,r.saida)+(diasEntre(HOJE,r.saida)===1?' noite':' noites')+' restando')),alca('Na casa agora'));
+  if(proximas.length) blocos.chegadas=cartao('Próximas chegadas',proximas.slice(0,3).map(r=>{const d=diasEntre(HOJE,r.entrada);
+    return cartaoHosp(r,(d===0?'Chega hoje':d===1?'Chega amanhã':'Chega em '+d+' dias')+' · '+DIA_MES(r.entrada)+' a '+DIA_MES(r.saida));}),alca('Próximas chegadas'));
 
   const ym=HOJE.slice(0,7), d=DADOS.meses[ym], pago=d?d[1]:0;
   const prog=r2(RES.filter(r=>r.status==='programada'&&r.pagamento&&r.pagamento.slice(0,7)===ym).reduce((s,r)=>s+r.liquido,0));
   const nm=noitesPorMes(), oc=nm[ym]||0, gastos=r2(custos.filter(c=>c.data.slice(0,7)===ym).reduce((s,c)=>s+c.valor,0));
-  pg.append(cartao(NOMES_L[+ym.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' de '+ym.slice(0,4),[
-    el('div',{class:'linhas'},[linha('Recebido',brl(pago),COR.liquido),linha('Programado',brl(prog),'#cfdccf'),
+  blocos.mes=cartao(NOMES_L[+ym.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' de '+ym.slice(0,4),[
+    el('div',{class:'linhas'},[linha('Recebido',brl(pago),COR.liquido),linha('Programado',brl(prog),COR.programado),
       custoEstado==='pronto'&&gastos?linha('Custos lançados',brl(-gastos),COR.taxa):null,
       el('div',{class:'linha total-g'},[el('span',{class:'n',text:'Total do mês'}),el('span',{class:'ajusta',text:brl(r2(pago+prog-(custoEstado==='pronto'?gastos:0)))})]),
-      linha('Ocupação do mês',pct(oc/diasNoMes(ym)),null,num(oc)+(oc===1?' noite':' noites'))])]));
+      linha('Ocupação do mês',pct(oc/diasNoMes(ym)),null,num(oc)+(oc===1?' noite':' noites'))])],alca('Mês corrente'));
 
   const ats=[['resultado','Lançar custo','<path d="M12 5v14M5 12h14"/>'],['reservas','Ver reservas','<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'],
     ['ganhos','Ganhos','<path d="M5 20V10M10 20V4M15 20v-8M20 20V7"/>'],['visao','Visão geral','<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>']];
-  pg.append(cartao('Atalhos',[el('div',{class:'atalhos-ini'},ats.map(([id,t,ic])=>{
-    const b=el('button',{type:'button'},[icone(ic),el('span',{text:t})]);b.addEventListener('click',()=>ir(id));return b;}))]));
+  blocos.atalhos=cartao('Atalhos',[el('div',{class:'atalhos-ini'},ats.map(([id,t,ic])=>{
+    const b=el('button',{type:'button'},[icone(ic),el('span',{text:t})]);b.addEventListener('click',()=>ir(id));return b;}))],alca('Atalhos'));
 
   const ev=[];
   reservas.filter(r=>r.status!=='programada'&&r.pagamento&&r.pagamento<=HOJE).forEach(r=>ev.push({q:r.pagamento,t:'Repasse recebido',s:quem(r),v:brl(r.liquido)}));
   custos.forEach(c=>ev.push({q:c.data,t:'Custo lançado',s:c.categoria+(c.descricao?' · '+c.descricao:''),v:'-'+brl(c.valor)}));
   reservasFora.forEach(c=>ev.push({q:c.entrada,t:'Reserva por fora',s:c.canal+' · '+DIA_MES(c.entrada)+' a '+DIA_MES(c.saida),v:brl(c.valor)}));
   ev.sort((x,y)=>y.q.localeCompare(x.q));
-  pg.append(cartao('Atualizações',[ev.length?el('div',{class:'atual'},ev.slice(0,6).map(e=>el('div',{class:'at-i'},[
+  blocos.atual=cartao('Atualizações',[ev.length?el('div',{class:'atual'},ev.slice(0,6).map(e=>el('div',{class:'at-i'},[
       el('span',{class:'at-t'},[el('b',{text:e.t}),el('span',{text:e.s})]),
-      el('span',{class:'at-v'},[el('b',{text:e.v}),el('span',{text:dataBR(e.q)})])]))):el('p',{class:'suave',text:'Nada registrado ainda.'})]));
+      el('span',{class:'at-v'},[el('b',{text:e.v}),el('span',{text:dataBR(e.q)})])]))):el('p',{class:'suave',text:'Nada registrado ainda.'})],alca('Atualizações'));
+
+  const salva=(prefs().ordem_inicio||[]).filter(k=>INICIO_PADRAO.includes(k));
+  salva.concat(INICIO_PADRAO.filter(k=>!salva.includes(k))).filter(k=>blocos[k]).forEach(k=>{blocos[k].dataset.bloco=k;pg.append(blocos[k]);});
 };
 PG.visao=pg=>{
   const meses=listaMeses(de,ate).filter(m=>DADOS.meses[m]), t=soma(meses), A=anoExato(de,ate);
@@ -292,8 +319,8 @@ PG.visao=pg=>{
   const g=areaGrafico('Receita líquida e taxa Airbnb por mês');
   pg.append(cartao('Receita por mês',[g.caixa]));
   desenha(g.cv,{type:'bar',data:{labels:meses.map(rot),datasets:[
-    {label:'Receita líquida',data:meses.map(m=>DADOS.meses[m][1]),backgroundColor:COR.liquido,borderColor:'#fff',borderWidth:1,borderRadius:3,maxBarThickness:26},
-    {label:'Taxa Airbnb',data:meses.map(m=>valor(m,'taxa')),backgroundColor:COR.taxa,borderColor:'#fff',borderWidth:1,borderRadius:3,maxBarThickness:26}]},
+    {label:'Receita líquida',data:meses.map(m=>DADOS.meses[m][1]),backgroundColor:COR.liquido,borderColor:COR.fundo,borderWidth:1,borderRadius:3,maxBarThickness:26},
+    {label:'Taxa Airbnb',data:meses.map(m=>valor(m,'taxa')),backgroundColor:COR.taxa,borderColor:COR.fundo,borderWidth:1,borderRadius:3,maxBarThickness:26}]},
     options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:escalas(eixoR,true),
       onClick:(e,els)=>{if(els.length){mesSel=meses[els[0].index];ir('mes');}},
       plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(c.parsed.y),footer:its=>'Receita bruta: '+brl(DADOS.meses[meses[its[0].dataIndex]][0])}}}}});
@@ -356,7 +383,7 @@ PG.comparativo=pg=>{
   const acum=series.map(s=>{let t=0;return s.map(v=>v==null?null:r2(t+=v));});
   const g2=areaGrafico(nome+' acumulada no ano');
   pg.append(cartao('Acumulado no ano',[g2.caixa]));
-  desenha(g2.cv,{type:'line',data:{labels:NOMES,datasets:comp.map((an,i)=>({label:an,data:acum[i],borderColor:COR.anos[i],backgroundColor:COR.anos[i],borderWidth:2,pointRadius:3,pointHoverRadius:5,pointBorderColor:'#fff',pointBorderWidth:1.5,tension:.15}))},
+  desenha(g2.cv,{type:'line',data:{labels:NOMES,datasets:comp.map((an,i)=>({label:an,data:acum[i],borderColor:COR.anos[i],backgroundColor:COR.anos[i],borderWidth:2,pointRadius:3,pointHoverRadius:5,pointBorderColor:COR.fundo,pointBorderWidth:1.5,tension:.15}))},
     options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:escalas(eixoR),plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(acum[c.datasetIndex][c.dataIndex])}}}}});
 
   const fimS=String(fim).padStart(2,'0'), sa=soma(listaMeses(comp[0]+'-01',comp[0]+'-'+fimS)), sb=soma(listaMeses(comp[1]+'-01',comp[1]+'-'+fimS));
@@ -381,7 +408,7 @@ PG.sazonalidade=pg=>{
     NOMES.forEach((n,i)=>{const m=ym2(an,i+1), v=valor(m,metrica);
       const c=el('button',{type:'button',class:'cel'+(v==null?' nulo':v===0?' zero':''),text:compacto(v),'aria-label':NOMES_L[i]+' de '+an+': '+compacto(v)+(v==null?'':' ('+brl(v)+')')});
       if(v==null)c.disabled=true;
-      else{ if(v>0){const k=classe(v);c.style.background=COR.calor[k];if(k>=3)c.style.color='#fff';}
+      else{ if(v>0){const k=classe(v);c.style.background=COR.calor[k];if(k>=3)c.style.color=COR.calorTexto;}
         comDica(c,rot(m),nome+': '+brl(v));c.addEventListener('click',()=>{dicaEl().hidden=true;mesSel=m;ir('mes');}); }
       grade.append(c);});});
   const escala=el('div',{class:'escala'},[document.createTextNode('menos')].concat(COR.calor.map(c=>el('i',{style:'background:'+c})),[document.createTextNode('mais')]));
@@ -445,7 +472,7 @@ PG.taxas=pg=>{
   const g=areaGrafico('Taxa efetiva do Airbnb por mês');
   pg.append(cartao('Taxa efetiva por mês',[g.caixa]));
   desenha(g.cv,{type:'line',data:{labels:meses.map(rot),datasets:[{label:'Taxa efetiva',data:serie,
-    borderColor:COR.taxa,backgroundColor:COR.taxa,borderWidth:2,pointRadius:4,pointHoverRadius:6,pointBorderColor:'#fff',pointBorderWidth:2,spanGaps:true}]},
+    borderColor:COR.taxa,backgroundColor:COR.taxa,borderWidth:2,pointRadius:4,pointHoverRadius:6,pointBorderColor:COR.fundo,pointBorderWidth:2,spanGaps:true}]},
     options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:escalas(v=>num(v)+'%'),plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const v=serie[c.dataIndex];return v==null?'sem receita':num(v,1)+'%';}}}}}});
 
   const linhas=meses.map(m=>{const d=DADOS.meses[m],a=aliq(m);return [rot(m),brl(d[0]),brl(r2(d[0]-d[1])),a==null?'—':pct(a),brl(d[1])];});
@@ -539,10 +566,10 @@ PG.ganhos=pg=>{
   const i=meses.indexOf(mesGanho), janela=meses.slice(Math.max(0,Math.min(i-4,meses.length-7)),Math.max(0,Math.min(i-4,meses.length-7))+7);
   const pago=m=>DADOS.meses[m]?DADOS.meses[m][1]:0;
   const g=areaGrafico('Pago e programado por mês');
-  pg.append(cartao('Resumo',[g.caixa,legenda([[COR.liquido,'Pago'],['#cfdccf','Programado']])]));
+  pg.append(cartao('Resumo',[g.caixa,legenda([[COR.liquido,'Pago'],[COR.programado,'Programado']])]));
   desenha(g.cv,{type:'bar',data:{labels:janela.map(rot),datasets:[
-      {label:'Pago',data:janela.map(pago),backgroundColor:janela.map(m=>m===mesGanho?COR.liquido:'#7f9886'),borderRadius:6,maxBarThickness:40},
-      {label:'Programado',data:janela.map(m=>prog[m]||0),backgroundColor:'#e3ece3',borderColor:COR.liquido,borderWidth:1.5,borderRadius:6,maxBarThickness:40}]},
+      {label:'Pago',data:janela.map(pago),backgroundColor:janela.map(m=>m===mesGanho?COR.liquido:COR.pagoOutros),borderRadius:6,maxBarThickness:40},
+      {label:'Programado',data:janela.map(m=>prog[m]||0),backgroundColor:COR.programadoFundo,borderColor:COR.liquido,borderWidth:1.5,borderRadius:6,maxBarThickness:40}]},
     options:{maintainAspectRatio:false,scales:escalas(eixoR,true),onClick:(e,els)=>{if(els.length){mesGanho=janela[els[0].index];render();}},
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(c.parsed.y)}}}}});
   const ant=el('button',{type:'button','aria-label':'Mês anterior',text:'‹'}), prox=el('button',{type:'button','aria-label':'Próximo mês',text:'›'});
@@ -554,7 +581,7 @@ PG.ganhos=pg=>{
   const bruto=(d?d[0]:0)+(progBruto[mesGanho]||0), taxa=(d?r2(d[0]-d[1]):0)+(progTaxa[mesGanho]||0), ajustes=r2(RES.filter(r=>r.status==='programada'&&r.tipo==='ajuste'&&r.pagamento.slice(0,7)===mesGanho).reduce((s,r)=>s+r.liquido,0));
   const oc=nm[mesGanho]||0;
   pg.append(cartao(titulo.charAt(0).toUpperCase()+titulo.slice(1),[el('div',{class:'linhas'},[
-    linha('Pago',brl(p),COR.liquido),linha('Programado',brl(pr),'#cfdccf'),el('div',{class:'linha total-g'},[el('span',{class:'n',text:'Total (BRL)'}),el('span',{text:brl(r2(p+pr))})])]),
+    linha('Pago',brl(p),COR.liquido),linha('Programado',brl(pr),COR.programado),el('div',{class:'linha total-g'},[el('span',{class:'n',text:'Total (BRL)'}),el('span',{text:brl(r2(p+pr))})])]),
     acord('Detalhamento dos pagamentos',[el('div',{class:'linhas'},[linha('Ganhos brutos',brl(r2(bruto))),linha('Ajustes',brl(ajustes)),linha('Taxa de serviço',brl(-r2(taxa))),linha('Total',brl(r2(p+pr)))])]),
     acord('Taxa de ocupação',[el('div',{class:'linhas'},[linha('Noites ocupadas',num(oc),null,'de '+diasNoMes(mesGanho)+' dias'),linha('Ocupação',pct(oc/diasNoMes(mesGanho)))]),
       el('p',{class:'suave',text:'Calculada pelas datas das estadias, sobre os dias corridos do mês. O Airbnb desconta as datas bloqueadas, por isso o percentual dele pode ser maior.'})])]));
@@ -615,7 +642,7 @@ PG.resultado=pg=>{
     const vazio=(nome,txt)=>el('div',{class:'casc'},[el('span',{text:nome}),el('div',{class:'trilho breve'}),el('span',{class:'val suave',text:txt})]);
     const pronto=custoEstado==='pronto', tem=pronto&&itensC.length>0, entra=r2(t.liquido+totR), lucro=r2(entra-totC);
     cascata.replaceChildren(...[faixa('Bruta',t.bruto,COR.apagado,0),faixa('Taxa Airbnb',t.taxa,COR.taxa,t.liquido),faixa('Líquida',t.liquido,COR.liquido,0),
-      itensR.length?faixa('Por fora',totR,'#8fa694',t.liquido):null,
+      itensR.length?faixa('Por fora',totR,COR.fora,t.liquido):null,
       tem?faixa('Custos',totC,COR.desce,Math.max(0,entra-totC)):vazio('Custos',pronto?'sem lançamentos':'—'),
       tem?faixa('Lucro',lucro,COR.anos[1],0):vazio('Lucro','—')].filter(Boolean));
     situacao.textContent=custoEstado==='carregando'?'Carregando os lançamentos…':custoEstado==='indisponivel'?'O registro de lançamentos não está disponível nesta visualização.':'';
@@ -647,7 +674,41 @@ PG.resultado=pg=>{
   };
   pintaCustos();
 };
+const TEMAS=['claro','sistema','escuro'], NOME_T={claro:'Claro',escuro:'Escuro',sistema:'Igual ao celular'};
+const IC_T={claro:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  sistema:'<rect x="5" y="2" width="14" height="20" rx="3"/><path d="M11 18h2"/>',escuro:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'};
+function chaveTema(atual,aoMudar){
+  let i=Math.max(0,TEMAS.indexOf(atual)), drag=null;
+  const sw=el('div',{class:'tsw',role:'radiogroup','aria-label':'Tema',style:'--i:'+i},[el('span',{class:'tth','aria-hidden':'true'})]);
+  TEMAS.forEach((k,j)=>sw.append(el('button',{type:'button',role:'radio','aria-checked':String(j===i),tabindex:j===i?'0':'-1','aria-label':NOME_T[k],'data-tv':k},[icone(IC_T[k])])));
+  const W=()=>sw.querySelector('button').offsetWidth;
+  const marca=(j,avisa)=>{j=Math.max(0,Math.min(2,j));sw.classList.remove('arr');sw.style.removeProperty('--x');sw.style.setProperty('--i',j);
+    sw.querySelectorAll('button').forEach((b,k)=>{b.setAttribute('aria-checked',String(k===j));b.tabIndex=k===j?0:-1;});
+    if(avisa&&j!==i){i=j;if(navigator.vibrate)try{navigator.vibrate(8);}catch(_){}aoMudar(TEMAS[j]);}};
+  sw.addEventListener('pointerdown',e=>{drag={x0:e.clientX,base:i*W(),mov:false};try{sw.setPointerCapture(e.pointerId);}catch(_){}});
+  sw.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x0;if(Math.abs(dx)>4)drag.mov=true;if(!drag.mov)return;e.preventDefault();
+    sw.classList.add('arr');sw.style.setProperty('--x',Math.max(0,Math.min(2*W(),drag.base+dx))+'px');});
+  sw.addEventListener('pointerup',e=>{if(!drag)return;const dd=drag;drag=null;
+    if(dd.mov)marca(Math.round(Math.max(0,Math.min(2*W(),dd.base+e.clientX-dd.x0))/W()),true);
+    else{const b=document.elementFromPoint(e.clientX,e.clientY);const t=b&&b.closest('.tsw [data-tv]');if(t)marca(TEMAS.indexOf(t.dataset.tv),true);}
+    const f=sw.querySelector('[aria-checked=true]');if(f&&document.activeElement&&sw.contains(document.activeElement))f.focus();});
+  sw.addEventListener('pointercancel',()=>{drag=null;marca(i);});
+  sw.addEventListener('keydown',e=>{const k=e.key;let j=null;
+    if(k==='ArrowRight'||k==='ArrowDown')j=i+1;else if(k==='ArrowLeft'||k==='ArrowUp')j=i-1;else if(k==='Home')j=0;else if(k==='End')j=2;
+    if(j==null)return;e.preventDefault();marca(j,true);const f=sw.querySelector('[aria-checked=true]');if(f)f.focus();});
+  return sw;
+}
 PG.config=pg=>{
+  const atual=prefs().tema||'sistema', valorT=el('span',{text:NOME_T[atual]||NOME_T.sistema});
+  const linhaT=el('div',{class:'trow'},[icone(IC_T.escuro),el('div',{class:'trow-t'},[el('b',{text:'Tema'}),valorT]),
+    chaveTema(atual,async v=>{valorT.textContent=NOME_T[v];window.recantoTema(v);try{await salvaPrefs({tema:v});}catch(e){if(window.console)console.error(e);}})]);
+  pg.append(cartao('Aparência',[linhaT]));
+  const aviso=el('p',{class:'suave',role:'status'});
+  const restaura=el('button',{type:'button',text:'Restaurar ordem padrão'});
+  restaura.addEventListener('click',async()=>{try{await salvaPrefs({ordem_inicio:[]});aviso.textContent='Ordem padrão restaurada.';}catch(e){aviso.textContent='Não foi possível salvar agora. Tente de novo.';}});
+  pg.append(cartao('Início',[el('div',{class:'cfg-linha'},[el('div',{class:'trow-t'},[el('b',{text:'Ordem dos blocos'}),
+    el('span',{text:'Arraste pela alça no canto de cada bloco do Início.'})]),restaura]),aviso]));
+  pg.append(el('h2',{class:'cfg-sobre',text:'Sobre os dados'}));
   pg.append(el('p',{class:'suave',text:'Números dos relatórios de ganhos do Airbnb, de 01/12/2021 a '+DADOS.atualizado+'.'}));
   const conf=[];ANOS.forEach(a=>{const A=DADOS.anos[a],t=soma(listaMeses(A.ini,A.fim));
     [['bruto','bruta'],['taxa','taxa'],['liquido','líquida']].forEach(([k,n])=>conf.push([a+', '+n,brl(t[k]),brl(A.pdf[k]),brl(r2(t[k]-A.pdf[k]))]));});
@@ -663,6 +724,64 @@ PG.config=pg=>{
     el('p',{class:'suave'},[el('a',{href:'https://www.airbnb.com.br/help/article/1857',rel:'noopener noreferrer',text:'Central de Ajuda do Airbnb: taxas de serviço'})])]));
   pg.append(acord('Onde ficam os lançamentos',[el('p',{class:'suave',text:'Os dados, os lançamentos e os anexos ficam num banco protegido por login. Só os e-mails autorizados conseguem ver, lançar ou excluir.'})]));
 };
+
+/* ---------- Início: arrastar os blocos pela alça ----------
+   O bloco acompanha o dedo; os vizinhos abrem a vaga; perto da borda a página rola sozinha.
+   Pelo teclado: foco na alça e setas para cima ou para baixo. */
+let arrastandoInicio=false, renderPendente=false;
+function blocosIni(){return [...document.querySelectorAll('#pagina > [data-bloco]')];}
+async function gravaOrdemInicio(){const ordem=blocosIni().map(x=>x.dataset.bloco);
+  const todas=ordem.concat((prefs().ordem_inicio||[]).filter(k=>!ordem.includes(k)&&INICIO_PADRAO.includes(k)));
+  try{await salvaPrefs({ordem_inicio:todas});}catch(e){if(window.console)console.error(e);}}
+(function(){
+  let d=null;
+  document.addEventListener('pointerdown',e=>{
+    const g=e.target.closest&&e.target.closest('.alca');if(!g||e.button>0)return;
+    const bl=g.closest('[data-bloco]'),all=blocosIni(),i=all.indexOf(bl);if(i<0)return;e.preventDefault();
+    try{g.setPointerCapture(e.pointerId);}catch(_){}
+    const rs=all.map(x=>x.getBoundingClientRect());
+    const gap=all.length>1?Math.max(0,(i<all.length-1?rs[i+1].top-rs[i].bottom:rs[i].top-rs[i-1].bottom)):16;
+    d={el:bl,all,i,to:i,rs,h:rs[i].height+gap,y0:e.clientY+scrollY,y:e.clientY,raf:0,moveu:false};
+    arrastandoInicio=true;bl.classList.add('erguido');document.body.classList.add('arrastando');
+    all.forEach(x=>{if(x!==bl)x.classList.add('desliza');});
+    if(navigator.vibrate)try{navigator.vibrate(10);}catch(_){}
+    laco();
+  },true);
+  function posiciona(){
+    const dy=d.y+scrollY-d.y0;if(Math.abs(dy)>3)d.moveu=true;
+    d.el.style.transform='translateY('+dy+'px) scale(1.02)';
+    const c=d.rs[d.i].top+d.rs[d.i].height/2+dy;let to=d.i;
+    d.rs.forEach((r,k)=>{const m=r.top+r.height/2;if(k<d.i&&c<m&&k<to)to=k;if(k>d.i&&c>m)to=Math.max(to,k);});d.to=to;
+    d.all.forEach((x,k)=>{if(x===d.el)return;let t=0;if(d.i<k&&k<=d.to)t=-d.h;else if(d.to<=k&&k<d.i)t=d.h;x.style.transform=t?'translateY('+t+'px)':'';});
+  }
+  function laco(){if(!d)return;const borda=70,baixo=innerHeight-borda-90;let v=0;
+    if(d.y<borda)v=-Math.ceil((borda-d.y)/6);else if(d.y>baixo)v=Math.ceil((d.y-baixo)/6);
+    if(v)scrollBy(0,v);posiciona();d.raf=requestAnimationFrame(laco);}
+  document.addEventListener('pointermove',e=>{if(d){e.preventDefault();d.y=e.clientY;}},{passive:false});
+  document.addEventListener('touchmove',e=>{if(d)e.preventDefault();},{passive:false});
+  async function solta(){
+    if(!d)return;const D=d;d=null;cancelAnimationFrame(D.raf);
+    const r0=D.el.getBoundingClientRect();
+    D.all.forEach(x=>{x.classList.remove('desliza');x.style.transform='';});
+    if(D.to!==D.i)D.el.parentNode.insertBefore(D.el,D.to<D.i?D.all[D.to]:D.all[D.to].nextSibling);
+    const r1=D.el.getBoundingClientRect();D.el.style.transform='translateY('+(r0.top-r1.top)+'px)';D.el.getBoundingClientRect();
+    D.el.classList.remove('erguido');D.el.classList.add('desliza');D.el.style.transform='';
+    setTimeout(()=>D.el.classList.remove('desliza'),220);
+    document.body.classList.remove('arrastando');arrastandoInicio=false;
+    if(D.to!==D.i)await gravaOrdemInicio();
+    if(renderPendente){renderPendente=false;setTimeout(render,240);}
+  }
+  ['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,solta));
+  document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('.alca')){e.preventDefault();e.stopPropagation();}},true);
+  document.addEventListener('keydown',e=>{
+    const g=e.target.closest&&e.target.closest('.alca');if(!g||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;
+    const bl=g.closest('[data-bloco]'),all=blocosIni(),i=all.indexOf(bl),j=i+(e.key==='ArrowUp'?-1:1);
+    if(i<0||j<0||j>=all.length)return;e.preventDefault();
+    bl.parentNode.insertBefore(bl,j<i?all[j]:all[j].nextSibling);g.focus();
+    const av=document.getElementById('avisoOrdem');if(av)av.textContent='Bloco movido para a posição '+(j+1)+' de '+all.length+'.';
+    gravaOrdemInicio();
+  });
+})();
 
 /* ---------- período ---------- */
 function rotuloPeriodo(){return de===ate?rot(de):rot(de)+' – '+rot(ate);}
@@ -684,6 +803,7 @@ function fechaPop(){pend=null;document.getElementById('popPeriodo').hidden=true;
 /* ---------- navegação ---------- */
 const celular=()=>matchMedia('(max-width:860px)').matches;
 function render(){
+  if(arrastandoInicio){renderPendente=true;return;}
   const s=SECOES.find(x=>x.id===pagina)||SECOES[0];pagina=s.id;
   graficos.forEach(g=>g.destroy());graficos=[];pintaCustos=null;dicaEl().hidden=true;
   document.getElementById('titulo').textContent=s.nome;
@@ -716,6 +836,7 @@ function ir(id){pagina=id;try{location.hash=id;}catch(e){}document.getElementByI
   document.getElementById('btnFechaNotif').addEventListener('click',fechaNotif);
   document.getElementById('veuNotif').addEventListener('click',fechaNotif);
   document.getElementById('btnLidas').addEventListener('click',()=>{const L=lidas();notificacoes().forEach(n=>L.add(n.id));guardaLidas(L);pintaNotif();atualizaSelo();});
+  addEventListener('recanto-tema',()=>{corTema();render();});
   let tr=null;addEventListener('resize',()=>{clearTimeout(tr);tr=setTimeout(()=>encaixa(),160);});
   document.getElementById('btnPeriodo').addEventListener('click',e=>{e.stopPropagation();document.getElementById('popPeriodo').hidden?abrePop():fechaPop();});
   document.getElementById('popPeriodo').addEventListener('click',e=>e.stopPropagation());

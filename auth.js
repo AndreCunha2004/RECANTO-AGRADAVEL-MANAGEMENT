@@ -159,7 +159,27 @@
     const sair = document.getElementById('btnSair');
     sair.hidden = false;
     sair.onclick = async () => { await sb.auth.signOut(); location.reload(); };
+    await carregaPrefs(session.user.id);
     if (!appCarregado) { window.DADOS = dados; appCarregado = true; await carregaApp(); }
+  }
+
+  // Preferências do login (tema e ordem do Início). Valem em todos os aparelhos da pessoa.
+  // O localStorage do tema é só um atalho para abrir sem piscar; quem manda é a tabela.
+  async function carregaPrefs(uid) {
+    window.recantoSalvaPrefs = async parcial => {
+      const linha = Object.assign({ user_id: uid }, window.recantoPrefs || {}, parcial, { atualizado_em: new Date().toISOString() });
+      const { error } = await sb.from('preferencias').upsert(linha, { onConflict: 'user_id' });
+      if (error) throw erro(error);
+    };
+    const local = window.recantoTemaLocal ? window.recantoTemaLocal() : 'sistema';
+    try {
+      const { data, error } = await sb.from('preferencias').select('tema,ordem_inicio').maybeSingle();
+      if (error) throw error;
+      window.recantoPrefs = { tema: data ? data.tema : local, ordem_inicio: data && Array.isArray(data.ordem_inicio) ? data.ordem_inicio : [] };
+      if (data && window.recantoTema) window.recantoTema(data.tema);
+    } catch (e) {
+      window.recantoPrefs = { tema: local, ordem_inicio: [] };
+    }
   }
 
   document.getElementById('app').hidden = true;

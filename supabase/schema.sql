@@ -108,3 +108,28 @@ alter publication supabase_realtime add table public.custos, public.reservas;
 -- 7. Consulta de manutenção (mantém o projeto gratuito ativo). Não expõe dado nenhum.
 create or replace function public.ping() returns timestamptz language sql stable set search_path = '' as $$ select now() $$;
 grant execute on function public.ping() to anon, authenticated;
+
+-- ============================================================
+-- Preferências por usuário (tema e ordem do Início) — 27/11/2026
+-- Cada pessoa só lê e grava a própria linha, e só se estiver na lista de membros.
+-- ============================================================
+create table if not exists public.preferencias (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  tema text not null default 'sistema' check (tema in ('claro','escuro','sistema')),
+  ordem_inicio jsonb not null default '[]'::jsonb check (jsonb_typeof(ordem_inicio) = 'array'),
+  atualizado_em timestamptz not null default now()
+);
+alter table public.preferencias enable row level security;
+revoke all on public.preferencias from anon;
+grant select, insert, update on public.preferencias to authenticated;
+
+create policy "le as proprias" on public.preferencias
+  for select to authenticated
+  using (user_id = (select auth.uid()) and (select privado.eh_membro()));
+create policy "cria as proprias" on public.preferencias
+  for insert to authenticated
+  with check (user_id = (select auth.uid()) and (select privado.eh_membro()));
+create policy "altera as proprias" on public.preferencias
+  for update to authenticated
+  using (user_id = (select auth.uid()) and (select privado.eh_membro()))
+  with check (user_id = (select auth.uid()) and (select privado.eh_membro()));
