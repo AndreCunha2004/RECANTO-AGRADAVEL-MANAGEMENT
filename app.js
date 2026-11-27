@@ -94,8 +94,8 @@ function rosca(partes,centroValor,centroRotulo,fmt){
 
 /* ---------- estado ---------- */
 const SECOES=[
-  {id:'inicio',nome:'Início',curto:'Início',ico:'<path d="M4 11.5L12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/>'},
-  {id:'visao',nome:'Visão geral',curto:'Geral',filtro:true,barra:true,ico:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'},
+  {id:'inicio',nome:'Início',curto:'Início',barra:true,destaque:true,ico:'<path d="M4 11.5L12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/>'},
+  {id:'visao',nome:'Visão geral',curto:'Geral',filtro:true,ico:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'},
   {id:'ganhos',nome:'Ganhos',curto:'Ganhos',barra:true,ico:'<path d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3.2 4.5 1.5 4.5 3.3-2 3.2-4.5 3.2-4.5-1.4-4.5-3.2"/>'},
   {id:'mes',nome:'Mês a mês',curto:'Mês',fim:true,ico:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>'},
   {id:'comparativo',nome:'Comparativo',curto:'Comparar',ico:'<path d="M5 20V10M10 20V4M15 20v-8M20 20V7"/>'},
@@ -105,7 +105,7 @@ const SECOES=[
   {id:'ocupacao',nome:'Ocupação',ico:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'},
   {id:'reservas',nome:'Reservas',curto:'Reservas',barra:true,fim:true,ico:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'},
   {id:'resultado',nome:'Custos e lucro',curto:'Custos',filtro:true,barra:true,ico:'<path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h10"/><path d="M16 13.5h.01"/>'},
-  {id:'sobre',nome:'Sobre os dados',rodape:true,ico:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>'}
+  {id:'config',nome:'Configurações',rodape:true,ico:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'}
 ];
 const icone=s=>el('span',{html:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">'+s+'</svg>',style:'display:inline-flex'});
 let pagina='inicio', de='2026-01', ate='2026-11', mesSel=TODOS[TODOS.length-1], metrica='bruto', pend=null, anoRank=ANOS[ANOS.length-1];
@@ -210,7 +210,7 @@ function notificacoes(){
     if(d) out.push({id:'fecha:'+m,tipo:'mes',quando:HOJE.slice(0,8)+'01',ir:'ganhos',
       titulo:NOMES_L[+m.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' fechou com '+brl(d[1]),texto:'Receita bruta de '+brl(d[0])+' · taxa de '+brl(r2(d[0]-d[1]))});}
   if(DADOS.atualizado){const p=DADOS.atualizado.split('/'), iso=p[2]+'-'+p[1]+'-'+p[0], at=diasEntre(iso,HOJE);
-    if(at>=20) out.push({id:'dados:'+iso,tipo:'dados',quando:iso,ir:'sobre',
+    if(at>=20) out.push({id:'dados:'+iso,tipo:'dados',quando:iso,ir:'config',
       titulo:'Dados do Airbnb de '+DADOS.atualizado,texto:'Já faz '+at+' dias. Vale atualizar a carga.'});}
   const L=lidas();
   out.forEach(n=>n.nova=!L.has(n.id));
@@ -647,7 +647,7 @@ PG.resultado=pg=>{
   };
   pintaCustos();
 };
-PG.sobre=pg=>{
+PG.config=pg=>{
   pg.append(el('p',{class:'suave',text:'Números dos relatórios de ganhos do Airbnb, de 01/12/2021 a '+DADOS.atualizado+'.'}));
   const conf=[];ANOS.forEach(a=>{const A=DADOS.anos[a],t=soma(listaMeses(A.ini,A.fim));
     [['bruto','bruta'],['taxa','taxa'],['liquido','líquida']].forEach(([k,n])=>conf.push([a+', '+n,brl(t[k]),brl(A.pdf[k]),brl(r2(t[k]-A.pdf[k]))]));});
@@ -697,12 +697,14 @@ function render(){
 }
 function ir(id){pagina=id;try{location.hash=id;}catch(e){}document.getElementById('app').classList.remove('aberta');fechaPop();render();window.scrollTo({top:0});}
 (function iniciar(){
+  const TABS={};
   const menu=document.getElementById('menu'), rodape=document.getElementById('rodape'), app=document.getElementById('app'), tabbar=document.getElementById('tabbar');
   SECOES.forEach(s=>{
     const b=el('button',{type:'button',class:'item',id:'nav-'+s.id,title:s.nome},[icone(s.ico),el('span',{class:'rot',text:s.nome}),s.breve?el('span',{class:'breve',text:'em breve'}):null]);
     b.addEventListener('click',()=>ir(s.id));
     (s.rodape?rodape:menu).append(b); if(s.fim)menu.append(el('div',{class:'sep'}));
-    if(s.barra){const t=el('button',{type:'button',id:'tab-'+s.id},[icone(s.ico),el('span',{text:s.curto})]);t.addEventListener('click',()=>ir(s.id));tabbar.append(t);}});
+    if(s.barra){const t=el('button',{type:'button',id:'tab-'+s.id,class:s.destaque?'destaque':''},[icone(s.ico),el('span',{text:s.curto})]);t.addEventListener('click',()=>ir(s.id));TABS[s.id]=t;}});
+  ['ganhos','reservas','inicio','resultado'].forEach(id=>tabbar.append(TABS[id]));
   const mais=el('button',{type:'button','aria-label':'Abrir o menu completo'},[icone('<path d="M4 7h16M4 12h16M4 17h16"/>'),el('span',{text:'Menu'})]);
   mais.addEventListener('click',()=>app.classList.toggle('aberta'));tabbar.append(mais);
   try{if(localStorage.getItem('recanto-menu')==='recolhido')app.classList.add('recolhida');}catch(e){}

@@ -367,6 +367,14 @@ main,#pagina,.cartao,.grafico,.duas>*{min-width:0}
 
 @media (max-width:860px){ .app.recolhida .marca-txt{display:revert} }
 
+/* ===== barra inferior: Início destacado no centro ===== */
+.tabbar button.destaque{position:relative;margin-top:-26px;justify-self:center;align-self:center;width:60px;height:60px;min-height:0;border-radius:50%;
+  background:var(--marca);color:#fff;box-shadow:0 8px 22px rgba(79,107,87,.38);padding:0;justify-content:center;gap:0}
+.tabbar button.destaque .ico{width:24px;height:24px}
+.tabbar button.destaque span{font-size:10px;margin-top:-1px}
+.tabbar button.destaque[aria-current=page]{background:var(--marca);color:#fff;box-shadow:0 8px 22px rgba(79,107,87,.46),0 0 0 4px var(--fundo)}
+.tabbar button.destaque:focus-visible{outline:3px solid var(--areia-3);outline-offset:3px}
+
 /* Entrada (login) */
 .entrada .folha{width:34px;height:34px;display:block;margin:0 0 10px;fill:none;stroke:#4f6b57;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .entrada{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--areia-1);padding:20px}
