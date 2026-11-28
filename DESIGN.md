@@ -261,6 +261,14 @@ Uma linha só: "Tema" e o valor atual à esquerda; à direita, uma chave com tr�
 
 Cada cartão do Início tem uma alça de seis pontos no canto do cabeçalho. Segurar a alça ergue o bloco, que acompanha o dedo ou o mouse; os vizinhos deslizam para abrir a vaga, e perto da borda a página rola sozinha. Ao soltar, o bloco encaixa e a ordem fica salva no login. Pelo teclado: foco na alça e setas para cima ou para baixo. A saudação fica fixa no topo. Configurações tem "Restaurar ordem padrão". O cálculo usa só o eixo vertical, porque o Início é uma coluna.
 
+### Lançamento
+
+Uma folha que cobre a tela no celular e vira um painel central no computador. Começa por uma chave de duas posições: Custo ou Reserva. Campos obrigatórios levam asterisco; o resto é opcional e não bloqueia o salvar. Categorias e canais são pílulas de escolha única, não listas suspensas. Ao salvar, a folha fecha e um aviso curto confirma o que entrou ("Reserva de Guilherme salva."). Editar abre a mesma folha preenchida, com "Excluir" no rodapé e confirmação. Reserva lançada por fora tem os mesmos dados de uma reserva do Airbnb (hóspede, entrada e saída com horário, valor recebido, canal, pessoas, pets, contato e observações) e aparece no Início, em Reservas, no Calendário e nos avisos junto com as do Airbnb, com o avatar tracejado em areia para diferenciar a origem.
+
+### Calendário
+
+Uma grade de mês, domingo a sábado. Cada dia é dividido ao meio: a metade da manhã pertence a quem sai, a da tarde a quem entra, como no calendário de anfitrião. Verde para Airbnb, areia para reserva por fora, branco para livre. O primeiro nome do hóspede aparece no dia de entrada. Tocar no dia abre embaixo quem está na casa e as ações; em dia livre, oferece lançar uma reserva a partir dele.
+
 ### Itens que abrem
 
 Um título e uma seta. Fechados por padrão.

@@ -133,3 +133,82 @@ create policy "altera as proprias" on public.preferencias
   for update to authenticated
   using (user_id = (select auth.uid()) and (select privado.eh_membro()))
   with check (user_id = (select auth.uid()) and (select privado.eh_membro()));
+
+-- ============================================================
+-- Lançamentos completos — 27/11/2026
+-- Reserva por fora com os mesmos dados de uma reserva do Airbnb; custo ligado (opcional) a uma reserva.
+-- ============================================================
+alter table public.reservas
+  add column if not exists hospede text not null default '' check (char_length(hospede) <= 120),
+  add column if not exists hora_entrada text check (hora_entrada is null or hora_entrada ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  add column if not exists hora_saida text check (hora_saida is null or hora_saida ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  add column if not exists hospedes smallint check (hospedes is null or hospedes between 1 and 30),
+  add column if not exists pets smallint check (pets is null or pets between 0 and 10),
+  add column if not exists contato text not null default '' check (char_length(contato) <= 120),
+  add column if not exists editado_em timestamptz;
+alter table public.reservas_airbnb
+  add column if not exists hora_entrada text check (hora_entrada is null or hora_entrada ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  add column if not exists hora_saida text check (hora_saida is null or hora_saida ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$');
+alter table public.custos
+  add column if not exists reserva_ref text check (reserva_ref is null or reserva_ref ~ '^(airbnb|fora):[A-Za-z0-9-]{3,64}$'),
+  add column if not exists editado_em timestamptz;
+create index if not exists custos_reserva_ref on public.custos (reserva_ref) where reserva_ref is not null;
+
+-- ============================================================
+-- Avisos no celular (Web Push) — 27/11/2026
+-- A Edge Function "avisos" (supabase/functions/avisos) gera as chaves VAPID na primeira execução
+-- e guarda em push_segredos; a chave privada nunca sai do servidor.
+-- ============================================================
+create extension if not exists pg_net with schema extensions;
+create extension if not exists pg_cron;
+
+create table if not exists public.inscricoes_push (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  endpoint text not null unique check (endpoint ~ '^https://' and char_length(endpoint) <= 1000),
+  p256dh text not null check (char_length(p256dh) between 40 and 200),
+  auth text not null check (char_length(auth) between 10 and 60),
+  aparelho text not null default '' check (char_length(aparelho) <= 120),
+  criado_em timestamptz not null default now(),
+  ultimo_envio timestamptz
+);
+alter table public.inscricoes_push enable row level security;
+revoke all on public.inscricoes_push from anon;
+grant select, insert, update, delete on public.inscricoes_push to authenticated;
+create policy "le os proprios" on public.inscricoes_push for select to authenticated
+  using (user_id = (select auth.uid()) and (select privado.eh_membro()));
+create policy "cria os proprios" on public.inscricoes_push for insert to authenticated
+  with check (user_id = (select auth.uid()) and (select privado.eh_membro()));
+create policy "altera os proprios" on public.inscricoes_push for update to authenticated
+  using (user_id = (select auth.uid()) and (select privado.eh_membro()))
+  with check (user_id = (select auth.uid()) and (select privado.eh_membro()));
+create policy "apaga os proprios" on public.inscricoes_push for delete to authenticated
+  using (user_id = (select auth.uid()) and (select privado.eh_membro()));
+
+create table if not exists public.avisos_enviados (
+  chave text not null,
+  inscricao_id uuid not null references public.inscricoes_push(id) on delete cascade,
+  enviado_em timestamptz not null default now(),
+  primary key (chave, inscricao_id)
+);
+alter table public.avisos_enviados enable row level security;      -- sem política: só o servidor
+revoke all on public.avisos_enviados from anon, authenticated;
+
+create table if not exists public.push_segredos (
+  id smallint primary key default 1 check (id = 1),
+  vapid_publica text,
+  vapid_privada text,
+  segredo_cron text not null default encode(extensions.gen_random_bytes(32), 'hex')
+);
+alter table public.push_segredos enable row level security;        -- sem política: só o servidor
+revoke all on public.push_segredos from anon, authenticated;
+insert into public.push_segredos (id) values (1) on conflict (id) do nothing;
+
+-- Envio diário às 8h07 de Brasília (11h07 UTC). O segredo é lido na hora, não fica no texto do job.
+select cron.schedule('avisos-diarios', '7 11 * * *', $$
+  select net.http_post(
+    url := 'https://bvralcbsvnzioqdqlxwd.supabase.co/functions/v1/avisos',
+    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select segredo_cron from public.push_segredos where id = 1)),
+    body := '{"acao":"rodar"}'::jsonb,
+    timeout_milliseconds := 20000);
+$$);

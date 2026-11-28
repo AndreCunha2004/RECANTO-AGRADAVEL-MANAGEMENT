@@ -74,7 +74,7 @@
         pdf: { bruto: Number(r.pdf_bruto), taxa: Number(r.pdf_taxa), liquido: Number(r.pdf_liquido) }
       };
     });
-    const reservas = f.data.map(r => ({ codigo: r.codigo, tipo: r.tipo, status: r.status, hospede: r.hospede, data_reserva: r.data_reserva,
+    const reservas = f.data.map(r => ({ id: r.id, horaEntrada: r.hora_entrada || '', horaSaida: r.hora_saida || '', codigo: r.codigo, tipo: r.tipo, status: r.status, hospede: r.hospede, data_reserva: r.data_reserva,
       entrada: r.entrada, saida: r.saida, noites: r.noites, bruto: Number(r.bruto), taxa: Number(r.taxa), limpeza: Number(r.limpeza),
       pet: Number(r.pet), liquido: Number(r.liquido), pagamento: r.pagamento, descricao: r.descricao }));
     const cfgDb = Object.fromEntries(c.data.map(r => [r.chave, r.valor]));
@@ -82,15 +82,27 @@
   }
 
   // Ponte com o formato que o painel já usa para lançamentos (custos e reservas) e anexos.
-  function cria(tabela, d) {
-    const base = { descricao: d.descricao, valor: d.valor, anexo: d.anexo || null, anexo_tipo: d.anexoTipo || '', criado_em: d.criadoEm };
-    return tabela === 'custos'
-      ? Object.assign({ data: d.data, categoria: d.categoria }, base)
-      : Object.assign({ entrada: d.entrada, saida: d.saida, canal: d.canal }, base);
+  // nomes do painel (camelCase) -> colunas do banco. Só entram os campos que existem em cada tabela.
+  const COLUNAS = {
+    custos: { data: 'data', categoria: 'categoria', descricao: 'descricao', valor: 'valor', anexo: 'anexo', anexoTipo: 'anexo_tipo',
+      reservaRef: 'reserva_ref', criadoEm: 'criado_em', editadoEm: 'editado_em' },
+    reservas: { entrada: 'entrada', saida: 'saida', canal: 'canal', descricao: 'descricao', valor: 'valor', anexo: 'anexo', anexoTipo: 'anexo_tipo',
+      hospede: 'hospede', horaEntrada: 'hora_entrada', horaSaida: 'hora_saida', hospedes: 'hospedes', pets: 'pets', contato: 'contato',
+      criadoEm: 'criado_em', editadoEm: 'editado_em' }
+  };
+  function paraLinha(tabela, d) {
+    const m = COLUNAS[tabela], out = {};
+    for (const k in d) if (m[k] && d[k] !== undefined) out[m[k]] = d[k];
+    if ('anexo_tipo' in out && out.anexo_tipo == null) out.anexo_tipo = '';
+    if ('contato' in out && out.contato == null) out.contato = '';
+    if ('descricao' in out && out.descricao == null) out.descricao = '';
+    return out;
   }
+  const cria = paraLinha;
   function deLinha(r) {
-    const { id, anexo_tipo, criado_em, criado_por, ...resto } = r;
-    return { id, data: () => Object.assign({}, resto, { anexoTipo: anexo_tipo || '', criadoEm: criado_em }) };
+    const { id, anexo_tipo, criado_em, criado_por, editado_em, hora_entrada, hora_saida, reserva_ref, ...resto } = r;
+    return { id, data: () => Object.assign({}, resto, { anexoTipo: anexo_tipo || '', criadoEm: criado_em, editadoEm: editado_em,
+      horaEntrada: hora_entrada || '', horaSaida: hora_saida || '', reservaRef: reserva_ref || null }) };
   }
   function erro(e) {
     const c = e && (e.code || e.statusCode);
@@ -112,6 +124,12 @@
       async add(d) { const { error } = await sb.from(nome).insert(cria(nome, d)); if (error) throw erro(error); }
     }),
     doc: caminho => ({
+      async update(d) {
+        const [tabela, id] = caminho.split('/');
+        if (!COLUNAS[tabela]) throw { code: 'falha' };
+        const { error } = await sb.from(tabela).update(paraLinha(tabela, d)).eq('id', id);
+        if (error) throw erro(error);
+      },
       async delete() {
         const [tabela, id] = caminho.split('/');
         const { error } = await sb.from(tabela).delete().eq('id', id);
@@ -132,6 +150,53 @@
     async delete(id) { await sb.storage.from(BUCKET).remove([id]); return { deleted: true }; }
   };
   window.claude = { use: k => Promise.resolve(k === 'db' ? dbPonte : k === 'assets' ? assetsPonte : null) };
+  // horário de check-in e check-out das reservas do Airbnb (o relatório não traz)
+  window.recantoHorarioAirbnb = async (id, entrada, saida) => {
+    const { error } = await sb.from('reservas_airbnb').update({ hora_entrada: entrada, hora_saida: saida }).eq('id', id);
+    if (error) throw erro(error);
+  };
+
+  // Avisos no celular (Web Push). No iPhone só funciona com o site aberto pela Tela de Início.
+  const PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const deB64 = u => { const p = '='.repeat((4 - u.length % 4) % 4); const s = atob((u + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(s, ch => ch.charCodeAt(0)); };
+  async function registro() { const r = await navigator.serviceWorker.register('sw.js', { scope: './' }); await navigator.serviceWorker.ready; return r; }
+  window.recantoPush = {
+    ios: /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+    instalado: matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
+    async estado() {
+      if (!PUSH_OK) return 'sem-suporte';
+      if (Notification.permission === 'denied') return 'bloqueado';
+      const r = await navigator.serviceWorker.getRegistration('./');
+      const s = r && await r.pushManager.getSubscription();
+      return s ? 'ativo' : 'inativo';
+    },
+    async ativar() {
+      if (!PUSH_OK) throw { code: 'falha' };
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') throw { code: 'negado' };
+      const reg = await registro();
+      const { data, error } = await sb.functions.invoke('avisos', { body: { acao: 'chave' } });
+      if (error || !data || !data.chave) throw { code: 'falha' };
+      let s = await reg.pushManager.getSubscription();
+      if (!s) s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: deB64(data.chave) });
+      const j = s.toJSON();
+      const { error: e2 } = await sb.from('inscricoes_push').upsert(
+        { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, aparelho: navigator.userAgent.slice(0, 120) }, { onConflict: 'endpoint' });
+      if (e2) throw erro(e2);
+    },
+    async testar() {
+      const { data, error } = await sb.functions.invoke('avisos', { body: { acao: 'testar' } });
+      if (error) throw { code: 'falha' };
+      return data;
+    },
+    async desativar() {
+      const r = await navigator.serviceWorker.getRegistration('./');
+      const s = r && await r.pushManager.getSubscription();
+      if (s) { await sb.from('inscricoes_push').delete().eq('endpoint', s.endpoint); await s.unsubscribe(); }
+    }
+  };
+  if (PUSH_OK) navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
+
   window.urlAnexo = async id => {
     const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(id, 300);
     return error ? null : data.signedUrl;

@@ -428,6 +428,85 @@ body.arrastando{user-select:none;-webkit-user-select:none;overscroll-behavior:no
 @media (prefers-reduced-motion:reduce){.cartao.desliza{transition:none}}
 .cfg-sobre{font-size:15px;margin:6px 0 -4px}
 
+/* ===== Folha de lançamento (tela inteira no celular, painel no computador) ===== */
+body.com-folha{overflow:hidden}
+.veu-folha{position:fixed;inset:0;background:var(--veu);z-index:70}
+.folha{position:fixed;z-index:71;display:flex;flex-direction:column;background:var(--fundo);
+  inset:0;padding-top:env(safe-area-inset-top)}
+@media (min-width:720px){.folha{inset:auto;top:50%;left:50%;transform:translate(-50%,-50%);width:min(620px,94vw);max-height:90vh;border-radius:20px;
+  border:1px solid var(--areia-2);box-shadow:0 30px 80px var(--sombra-forte);padding-top:0}}
+.folha-cab{display:flex;align-items:center;gap:8px;padding:14px 12px 12px 18px;border-bottom:1px solid var(--areia-2)}
+.folha-cab h2{flex:1;margin:0;font-family:var(--fonte-titulo);font-weight:500;font-size:19px}
+.folha-cab h2:focus{outline:none}
+.folha-corpo{flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:14px}
+.folha-corpo>.seg{align-self:stretch;display:grid;grid-template-columns:1fr 1fr}
+.folha-corpo>.seg button{min-height:42px;font-size:15px}
+.folha-form{gap:14px}
+.folha-form .campo{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:12px;color:var(--tinta-2)}
+.folha-form input,.folha-form select,.folha-form textarea{font:inherit;font-size:16px;color:var(--tinta);background:var(--fundo);border:1px solid var(--areia-3);border-radius:12px;padding:10px 12px;min-height:46px;width:100%;min-width:0}
+.folha-form textarea{resize:vertical;min-height:84px}
+.folha-form input:focus,.folha-form select:focus,.folha-form textarea:focus{outline:2px solid var(--marca);outline-offset:1px;border-color:var(--marca)}
+.obrig{color:var(--rosa)}
+.noites-calc{margin:-4px 0 0;font-size:13px;color:var(--tinta-2);min-height:0}
+.noites-calc:empty{display:none}
+.folha-rodape{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.folha-rodape .principal{min-height:50px;font-size:16px;border-radius:14px}
+.aviso-suave:empty{display:none}
+.folha .aviso:empty{display:none}
+.folha .aviso{color:var(--rosa)}
+.form.folha-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+.aviso-suave{font-size:13px;color:var(--neutro);background:var(--neutro-claro);border-radius:10px;padding:8px 10px;margin:0}
+button.perigo{color:var(--rosa);border-color:var(--rosa-claro);background:transparent}
+.confirma{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border:1px solid var(--rosa-claro);border-radius:12px;font-size:14px}
+.confirma span{flex:1 1 100%}
+.confirma .perigo{background:var(--rosa);color:var(--contra);border-color:var(--rosa)}
+.escolhas{display:flex;flex-wrap:wrap;gap:8px}
+.escolhas button{min-height:38px;padding:6px 13px;border-radius:999px;border:1px solid var(--areia-3);background:var(--fundo);color:var(--tinta);font-size:14px}
+.escolhas button[aria-checked=true]{background:var(--tinta);color:var(--contra);border-color:var(--tinta)}
+.novo-lanc{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:14px;align-self:flex-start;padding:0 18px}
+.novo-lanc .ico{width:18px;height:18px}
+@media (max-width:560px){.novo-lanc{align-self:stretch}}
+.toast{position:fixed;left:50%;bottom:calc(98px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:90;
+  background:var(--tinta);color:var(--contra);padding:11px 16px;border-radius:14px;font-size:14px;max-width:min(92vw,420px);box-shadow:0 10px 30px var(--sombra-forte);transition:opacity .2s,transform .2s}
+.toast.vis{opacity:1;transform:translate(-50%,0)}
+@media (min-width:861px){.toast{bottom:28px}}
+
+/* reservas: por fora, ações, observações */
+.av.fora,.ini-agora .av.fora{background:var(--neutro-claro);color:var(--neutro);border:1px dashed var(--marca)}
+.acoes-res{display:flex;flex-wrap:wrap;gap:8px;padding-top:10px}
+.acoes-res button{min-height:38px;font-size:14px}
+.obs{margin:6px 0 0;font-size:14px;color:var(--tinta-2);white-space:pre-wrap}
+button.ini-agora{width:100%;text-align:left;border:0;background:transparent;padding:4px 0;min-height:0;border-radius:10px;font:inherit;color:inherit}
+button.ini-agora:hover{background:var(--hover)}
+.horarios{margin-top:10px;padding-top:10px;border-top:1px solid var(--areia-2)}
+
+/* ===== Calendário ===== */
+.cal-nav{display:flex;align-items:center;gap:8px}
+.cal-nav>button{min-width:40px;min-height:40px;font-size:20px;line-height:1;padding:0}
+.cal-tit{flex:1;text-align:center;margin:0;font-family:var(--fonte-titulo);font-weight:500;font-size:18px}
+.cal-nav .cal-hoje{font-size:14px;padding:0 12px}
+.cal-grade{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal-sem{text-align:center;font-size:12px;color:var(--tinta-2);padding:2px 0 6px}
+.cal-dia{position:relative;aspect-ratio:1/1;min-height:0;padding:0;border:1px solid var(--areia-2);border-radius:10px;background:var(--fundo);overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;font:inherit;color:var(--tinta)}
+.cal-dia .meia{position:absolute;top:0;bottom:0;width:50%;pointer-events:none}
+.cal-dia .manha{left:0}.cal-dia .tarde{right:0}
+.cal-dia .meia.airbnb{background:color-mix(in srgb,var(--liquido) 34%,transparent)}
+.cal-dia .meia.fora{background:color-mix(in srgb,var(--marca) 38%,transparent)}
+.cal-dia .num{position:relative;font-size:14px;font-variant-numeric:tabular-nums;margin-top:5px}
+.cal-dia .quem{position:relative;font-size:10px;line-height:1.1;max-width:94%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:auto;margin-bottom:5px;font-weight:500}
+.cal-dia.hoje{border-color:var(--tinta);border-width:2px}
+.cal-dia.sel{outline:3px solid var(--marca);outline-offset:1px}
+.cal-dia.choque{border-color:var(--rosa);border-width:2px}
+.cal-dia:hover{border-color:var(--areia-3)}
+@media (max-width:420px){.cal-grade{gap:3px}.cal-dia .num{font-size:13px;margin-top:3px}.cal-dia .quem{font-size:9px;margin-bottom:3px}}
+
+/* ===== Avisos no celular (gaveta) ===== */
+.push-caixa{margin:10px 12px 0;padding:12px;border:1px solid var(--areia-2);border-radius:14px;background:var(--fundo);display:flex;flex-direction:column;gap:8px}
+.push-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.push-acoes:empty{display:none}
+.folha-corpo>*{flex-shrink:0}
+
 /* Entrada (login) */
 .entrada .folha{width:34px;height:34px;display:block;margin:0 0 10px;fill:none;stroke:var(--verde);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .entrada{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--areia-1);padding:20px}
