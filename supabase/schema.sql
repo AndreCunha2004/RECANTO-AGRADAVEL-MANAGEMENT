@@ -212,3 +212,44 @@ select cron.schedule('avisos-diarios', '7 11 * * *', $$
     body := '{"acao":"rodar"}'::jsonb,
     timeout_milliseconds := 20000);
 $$);
+
+-- ============================================================
+-- Calendário do Airbnb (iCal) — 27/11/2026
+-- A Edge Function "calendario" lê o link de exportação do Airbnb a cada 3 horas e grava reservas e bloqueios;
+-- também publica um iCal das reservas por fora (sem nomes) para o Airbnb bloquear essas datas.
+-- O link do Airbnb tem token: é inserido direto no banco, nunca no repositório.
+-- ============================================================
+create table if not exists public.calendario_fontes (
+  id smallserial primary key,
+  origem text not null unique check (origem ~ '^[a-z]{3,20}$'),
+  url text not null check (url ~ '^https://'),
+  ultima_sync timestamptz,
+  ultimo_status text
+);
+alter table public.calendario_fontes enable row level security;     -- sem política: só o servidor
+revoke all on public.calendario_fontes from anon, authenticated;
+-- insert into public.calendario_fontes (origem, url) values ('airbnb', '<link de exportação do Airbnb>');
+
+create table if not exists public.bloqueios (
+  uid text primary key check (char_length(uid) <= 300),
+  origem text not null,
+  tipo text not null check (tipo in ('reserva','bloqueio')),
+  inicio date not null,
+  fim date not null check (fim > inicio),
+  codigo text check (codigo is null or codigo ~ '^[A-Z0-9]{6,14}$'),
+  atualizado_em timestamptz not null default now()
+);
+alter table public.bloqueios enable row level security;
+revoke all on public.bloqueios from anon;
+grant select on public.bloqueios to authenticated;
+create policy "membros leem" on public.bloqueios for select to authenticated using ((select privado.eh_membro()));
+
+alter table public.push_segredos add column if not exists token_ical text not null default encode(extensions.gen_random_bytes(24), 'hex');
+
+select cron.schedule('calendario-airbnb', '53 */3 * * *', $$
+  select net.http_post(
+    url := 'https://bvralcbsvnzioqdqlxwd.supabase.co/functions/v1/calendario',
+    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select segredo_cron from public.push_segredos where id = 1)),
+    body := '{"acao":"sincronizar"}'::jsonb,
+    timeout_milliseconds := 30000);
+$$);

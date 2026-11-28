@@ -164,9 +164,15 @@ function todasReservas(){
     hospede:r.hospede||'',entrada:r.entrada,saida:r.saida,noites:r.noites||diasEntre(r.entrada,r.saida),valor:r.liquido,horaEntrada:horaOk(r.horaEntrada),horaSaida:horaOk(r.horaSaida),base:r}));
   const f=reservasFora.map(c=>({ref:'fora:'+c.id,origem:'fora',canal:c.canal,hospede:c.hospede,entrada:c.entrada,saida:c.saida,noites:c.noites,valor:c.valor,
     horaEntrada:c.horaEntrada,horaSaida:c.horaSaida,base:c}));
-  return a.concat(f);
+  // reservas que o calendário do Airbnb já mostra, mas que ainda não vieram na carga dos relatórios
+  const cods=new Set(RES.map(r=>r.codigo).filter(Boolean));
+  const novas=(DADOS.bloqueios||[]).filter(b=>b.tipo==='reserva'&&!(b.codigo&&cods.has(b.codigo))&&!a.some(r=>r.entrada<b.fim&&r.saida>b.inicio))
+    .map(b=>({ref:'airbnb:'+(b.codigo||b.inicio),origem:'airbnb',canal:'Airbnb',hospede:'',entrada:b.inicio,saida:b.fim,noites:diasEntre(b.inicio,b.fim),valor:0,
+      horaEntrada:'',horaSaida:'',semCarga:true,base:{codigo:b.codigo,bruto:0,taxa:0,limpeza:0,pet:0,liquido:0,noites:diasEntre(b.inicio,b.fim),entrada:b.inicio,saida:b.fim}}));
+  return a.concat(f,novas);
 }
-const nomeRes=r=>r.hospede||(r.origem==='fora'?'Reserva por fora':'Hóspede');
+const bloqueado=d=>(DADOS.bloqueios||[]).some(b=>b.tipo==='bloqueio'&&b.inicio<=d&&b.fim>d);
+const nomeRes=r=>r.hospede||(r.semCarga?'Nova reserva Airbnb':r.origem==='fora'?'Reserva por fora':'Hóspede');
 const iniciais=r=>r.hospede?r.hospede.trim().split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase():String(+r.entrada.slice(8,10));
 function custosDaReserva(r){const fim=somaDias(r.saida,3);return custos.filter(c=>c.reservaRef===r.ref||(!c.reservaRef&&c.data>=r.entrada&&c.data<=fim));}
 // reserva por fora conta no mês da entrada
@@ -756,7 +762,8 @@ PG.reservas=pg=>{
     lista.replaceChildren(...L.map(r=>{const [cls,tx2]=situacao(r);
       const cv=custosDaReserva(r), totC=r2(cv.reduce((s,c)=>s+c.valor,0));
       const linhasDet=[];
-      if(r.origem==='airbnb'){const b=r.base, ant=b.data_reserva?diasEntre(b.data_reserva,b.entrada):null;
+      if(r.semCarga){linhasDet.push(linha('Código',r.base.codigo||'—'),el('p',{class:'obs',text:'Apareceu no calendário do Airbnb. Nome e valores entram na próxima carga dos relatórios.'}));}
+      else if(r.origem==='airbnb'){const b=r.base, ant=b.data_reserva?diasEntre(b.data_reserva,b.entrada):null;
         const ajustes=RES.filter(x=>x.tipo!=='reserva'&&x.codigo&&x.codigo===b.codigo);
         linhasDet.push(linha('Código',b.codigo||'—'),b.data_reserva?linha('Reservado em',dataBR(b.data_reserva),null,ant!=null?ant+' dias de antecedência':''):null,
           linha('Diária',brl(b.noites?r2((b.bruto-b.limpeza-b.pet)/b.noites):null)),linha('Receita bruta',brl(b.bruto)),linha('Taxa Airbnb',brl(b.taxa),null,pct(b.bruto?b.taxa/b.bruto:null)),
@@ -777,7 +784,7 @@ PG.reservas=pg=>{
       const det=el('div',{class:'linhas'},linhasDet.filter(Boolean).concat([acoes]));
       const card=el('details',{class:'res','data-ref':r.ref},[el('summary',{},[el('span',{class:'av'+(r.origem==='fora'?' fora':''),'aria-hidden':'true',text:iniciais(r)}),
         el('span',{class:'qm'},[el('b',{text:nomeRes(r)}),el('span',{text:DIA_MES(r.entrada)+' – '+DIA_MES(r.saida)+' · '+r.noites+(r.noites===1?' noite':' noites')+(r.origem==='fora'?' · '+r.canal:'')})]),
-        el('span',{class:'dir'},[el('span',{class:'pill '+cls,text:tx2}),el('span',{class:'vl',text:brl(r.valor)})])]),det]);
+        el('span',{class:'dir'},[el('span',{class:'pill '+cls,text:tx2}),el('span',{class:'vl',text:r.semCarga?'—':brl(r.valor)})])]),det]);
       if(abertasRes.has(r.ref))card.open=true;
       card.addEventListener('toggle',()=>{if(card.open)abertasRes.add(r.ref);else abertasRes.delete(r.ref);});
       return card;}));};
@@ -817,10 +824,14 @@ PG.calendario=pg=>{
   hoje.addEventListener('click',()=>{mesCal=HOJE.slice(0,7);diaCal=HOJE;render();});
   pg.append(el('div',{class:'cal-nav'},[ant,el('h2',{class:'cal-tit',text:nomeMes,'aria-live':'polite'}),prox,hoje]));
   // resumo do mês
-  let ocup=0;for(let d=1;d<=dias;d++)if(noite(iso(d)).length)ocup++;
-  const livre=[];{let i=0;while(i<120){while(i<120&&noite(somaDias(HOJE,i)).length)i++;const s=i;while(i<120&&!noite(somaDias(HOJE,i)).length)i++;
+  let ocup=0,bloq=0;for(let d=1;d<=dias;d++){if(noite(iso(d)).length)ocup++;else if(bloqueado(iso(d)))bloq++;}
+  const ocupado=d=>noite(d).length||bloqueado(d);
+  const livre=[];{let i=0;while(i<120){while(i<120&&ocupado(somaDias(HOJE,i)))i++;const s=i;while(i<120&&!ocupado(somaDias(HOJE,i)))i++;
     if(i-s>=2){livre.push([somaDias(HOJE,s),i-s]);break;}}}
-  pg.append(el('div',{class:'kpis'},[kpi('Noites ocupadas',num(ocup),'de '+dias+' no mês'),kpi('Ocupação',pct(ocup/dias)),kpi('Noites livres',num(dias-ocup)),
+  const abertos=dias-bloq;
+  pg.append(el('div',{class:'kpis'},[kpi('Noites ocupadas',num(ocup),'de '+dias+' no mês'),
+    kpi('Ocupação',pct(abertos?ocup/abertos:null),bloq?'sem as bloqueadas, como o Airbnb · '+pct(ocup/dias)+' do mês':'sobre os dias do mês'),
+    kpi('Livres',num(dias-ocup-bloq),bloq?num(bloq)+(bloq===1?' bloqueada':' bloqueadas'):''),
     kpi('Próxima janela livre',livre.length?DIA_MES(livre[0][0]):'—',livre.length?livre[0][1]+' noites ou mais':'nos próximos 4 meses')]));
   // grade
   const sem=['D','S','T','Q','Q','S','S'], semL=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
@@ -828,21 +839,22 @@ PG.calendario=pg=>{
   sem.forEach((s,i)=>grade.append(el('span',{class:'cal-sem','aria-hidden':'true',title:semL[i],text:s})));
   for(let i=0;i<primeiro;i++)grade.append(el('span',{class:'cal-vazio','aria-hidden':'true'}));
   for(let d=1;d<=dias;d++){
-    const dia=iso(d), n=noite(dia), m=manha(dia), chega=n.find(r=>r.entrada===dia), sai=m.find(r=>r.saida===dia);
+    const dia=iso(d), n=noite(dia), m=manha(dia), chega=n.find(r=>r.entrada===dia), sai=m.find(r=>r.saida===dia), bl=!n.length&&bloqueado(dia);
     const desc=[d+' de '+NOMES_L[mes-1]];
-    if(!n.length&&!m.length)desc.push('livre');
+    if(bl)desc.push('bloqueado no Airbnb');
+    else if(!n.length&&!m.length)desc.push('livre');
     if(sai)desc.push('saída de '+nomeRes(sai));
     if(chega)desc.push('entrada de '+nomeRes(chega));
     if(n.length&&!chega)desc.push('ocupado por '+nomeRes(n[0]));
     if(n.length>1)desc.push('atenção: '+n.length+' reservas na mesma noite');
-    const b=el('button',{type:'button',class:'cal-dia'+(dia===HOJE?' hoje':'')+(dia===diaCal?' sel':'')+(n.length>1?' choque':''),'aria-pressed':String(dia===diaCal)},[
+    const b=el('button',{type:'button',class:'cal-dia'+(bl?' bloq':'')+(dia===HOJE?' hoje':'')+(dia===diaCal?' sel':'')+(n.length>1?' choque':''),'aria-pressed':String(dia===diaCal)},[
       el('i',{class:'meia manha'+(m.length?' '+m[0].origem:'')}),el('i',{class:'meia tarde'+(n.length?' '+n[0].origem:'')}),
       el('span',{class:'num','aria-hidden':'true',text:String(d)}),chega?el('span',{class:'quem','aria-hidden':'true',text:(chega.hospede||'').split(' ')[0]||'•'}):null,
       el('span',{class:'so-leitor',text:desc.join(', ')})]);
     b.addEventListener('click',()=>{diaCal=dia===diaCal?null:dia;render();const s=document.querySelector('.cal-dia.sel');if(s)s.focus();});
     grade.append(b);
   }
-  pg.append(cartao(null,[grade,legenda([[COR.liquido,'Airbnb'],[COR.marca,'Por fora'],[COR.grade,'Livre']])]));
+  pg.append(cartao(null,[grade,legenda([[COR.liquido,'Airbnb'],[COR.marca,'Por fora'],[COR.apagado,'Bloqueado'],[COR.grade,'Livre']])]));
   // detalhe do dia
   if(diaCal&&diaCal.slice(0,7)===mesCal){
     const n=noite(diaCal), m=manha(diaCal), quem=[...new Set(m.concat(n))];
@@ -855,13 +867,24 @@ PG.calendario=pg=>{
       if(r.origem==='fora'){const ed=el('button',{type:'button',text:'Editar'});ed.addEventListener('click',()=>abreLancamento({editar:{col:'reservas',item:r.base}}));ac.append(ed);}
       filhos.push(el('div',{class:'ini-agora'},[el('span',{class:'av'+(r.origem==='fora'?' fora':''),'aria-hidden':'true',text:iniciais(r)}),
         el('span',{class:'qm'},[el('b',{text:nomeRes(r)}),el('span',{text:papel+' · '+DIA_MES(r.entrada)+' a '+DIA_MES(r.saida)+' · '+(r.origem==='fora'?r.canal:'Airbnb')})]),el('span',{class:'vl',text:brl(r.valor)})]),ac);});
-    if(!n.length){let k=0;while(k<120&&!noite(somaDias(diaCal,k)).length)k++;
-      filhos.push(el('p',{class:'suave',text:k>=120?'Livre por mais de 4 meses.':'Livre por '+k+(k===1?' noite':' noites')+', até '+DIA_MES(somaDias(diaCal,k))+'.'}));
+    if(!n.length&&bloqueado(diaCal))filhos.push(el('p',{class:'suave',text:'Bloqueado no calendário do Airbnb.'}));
+    else if(!n.length){let k=0;while(k<120&&!ocupado(somaDias(diaCal,k)))k++;
+      filhos.push(el('p',{class:'suave',text:k>=120?'Livre por mais de 4 meses.':'Livre por '+k+(k===1?' noite':' noites')+', até '+DIA_MES(somaDias(diaCal,k))+'.'}));}
+    if(!n.length){
       if(diaCal>=HOJE){const nr=el('button',{type:'button',class:'principal novo-lanc'},[icone('<path d="M12 5v14M5 12h14"/>'),el('span',{text:'Lançar reserva a partir de '+DIA_MES(diaCal)})]);
         nr.addEventListener('click',()=>abreLancamento({tipo:'reserva',entrada:diaCal}));filhos.push(nr);}}
     pg.append(cartao(dataBR(diaCal)+' · '+semL[new Date(diaCal+'T12:00:00').getDay()],filhos));
   }
-  pg.append(el('p',{class:'suave',text:'Mostra as reservas do Airbnb e as lançadas por fora. Datas bloqueadas no Airbnb ainda não aparecem.'}));
+  const sinc=el('div',{class:'cal-sync'});
+  if(DADOS.bloqueios===undefined)sinc.append(el('p',{class:'suave',text:'Os bloqueios do Airbnb aparecem no site com login.'}));
+  else{const em=DADOS.bloqueiosEm?new Date(DADOS.bloqueiosEm):null;
+    const txt=el('p',{class:'suave',role:'status',text:'Calendário do Airbnb '+(em?'atualizado em '+em.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'ainda não sincronizado')+'. Atualiza sozinho a cada 3 horas.'});
+    sinc.append(txt);
+    if(window.recantoSincronizaCalendario){const bt=el('button',{type:'button',text:'Atualizar agora'});
+      bt.addEventListener('click',async()=>{bt.disabled=true;txt.textContent='Atualizando…';
+        try{const r=await window.recantoSincronizaCalendario();toast('Calendário atualizado: '+r.reservas+' reservas e '+r.bloqueios+' bloqueios.');render();}
+        catch(e){txt.textContent='Não deu para atualizar agora. Tente de novo em instantes.';bt.disabled=false;}});sinc.append(bt);}}
+  pg.append(sinc);
 };
 PG.ganhos=pg=>{
   const nm=noitesPorMes(), prog={}, progBruto={}, progTaxa={};

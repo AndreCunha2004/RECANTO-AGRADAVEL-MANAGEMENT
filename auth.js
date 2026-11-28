@@ -56,11 +56,12 @@
 
   const nn = v => v == null ? null : Number(v);
   async function carregaDados() {
-    const [m, a, f, c] = await Promise.all([
+    const [m, a, f, c, b] = await Promise.all([
       sb.from('meses').select('ym,bruto,liquido').order('ym'),
       sb.from('anos').select('*').order('ano'),
       sb.from('reservas_airbnb').select('*').order('pagamento'),
-      sb.from('config').select('chave,valor')
+      sb.from('config').select('chave,valor'),
+      sb.from('bloqueios').select('tipo,inicio,fim,codigo,atualizado_em').order('inicio')
     ]);
     if (m.error || a.error || f.error || c.error) return null;
     if (!m.data.length || !a.data.length) return { vazio: true };
@@ -78,7 +79,10 @@
       entrada: r.entrada, saida: r.saida, noites: r.noites, bruto: Number(r.bruto), taxa: Number(r.taxa), limpeza: Number(r.limpeza),
       pet: Number(r.pet), liquido: Number(r.liquido), pagamento: r.pagamento, descricao: r.descricao }));
     const cfgDb = Object.fromEntries(c.data.map(r => [r.chave, r.valor]));
-    return { meses, anos, reservas, atualizado: cfgDb.atualizado || '' };
+    // calendário do Airbnb (iCal): bloqueios e reservas; se falhar, o painel abre sem eles
+    const bloqueios = b.error ? [] : b.data.map(x => ({ tipo: x.tipo, inicio: x.inicio, fim: x.fim, codigo: x.codigo || '' }));
+    const bloqueiosEm = !b.error && b.data.length ? b.data.reduce((mx, x) => x.atualizado_em > mx ? x.atualizado_em : mx, '') : '';
+    return { meses, anos, reservas, bloqueios, bloqueiosEm, atualizado: cfgDb.atualizado || '' };
   }
 
   // Ponte com o formato que o painel já usa para lançamentos (custos e reservas) e anexos.
@@ -196,6 +200,17 @@
     }
   };
   if (PUSH_OK) navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
+
+  // atualizar agora o calendário do Airbnb (o servidor também faz isso sozinho a cada 3 horas)
+  window.recantoSincronizaCalendario = async () => {
+    const { data, error } = await sb.functions.invoke('calendario', { body: { acao: 'sincronizar' } });
+    if (error || !data || (data.airbnb && data.airbnb.erro)) throw { code: 'falha' };
+    const r = await sb.from('bloqueios').select('tipo,inicio,fim,codigo,atualizado_em').order('inicio');
+    if (r.error) throw erro(r.error);
+    window.DADOS.bloqueios = r.data.map(x => ({ tipo: x.tipo, inicio: x.inicio, fim: x.fim, codigo: x.codigo || '' }));
+    window.DADOS.bloqueiosEm = new Date().toISOString();
+    return data.airbnb;
+  };
 
   window.urlAnexo = async id => {
     const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(id, 300);

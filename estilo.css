@@ -506,6 +506,9 @@ button.ini-agora:hover{background:var(--hover)}
 .push-acoes{display:flex;flex-wrap:wrap;gap:8px}
 .push-acoes:empty{display:none}
 .folha-corpo>*{flex-shrink:0}
+.cal-dia.bloq{background:repeating-linear-gradient(135deg,var(--areia-2) 0 4px,var(--fundo) 4px 8px);color:var(--tinta-2)}
+.cal-sync{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.cal-sync p{margin:0;flex:1 1 220px}
 
 /* Entrada (login) */
 .entrada .folha{width:34px;height:34px;display:block;margin:0 0 10px;fill:none;stroke:var(--verde);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
