@@ -263,7 +263,7 @@ Cada cartão do Início tem uma alça de seis pontos no canto do cabeçalho. Seg
 
 ### Lançamento
 
-Uma folha que cobre a tela no celular e vira um painel central no computador. Começa por uma chave de duas posições: Custo ou Reserva. Campos obrigatórios levam asterisco; o resto é opcional e não bloqueia o salvar. Categorias e canais são pílulas de escolha única, não listas suspensas. Ao salvar, a folha fecha e um aviso curto confirma o que entrou ("Reserva de Guilherme salva."). Editar abre a mesma folha preenchida, com "Excluir" no rodapé e confirmação. Reserva lançada por fora tem os mesmos dados de uma reserva do Airbnb (hóspede, entrada e saída com horário, valor recebido, canal, pessoas, pets, contato e observações) e aparece no Início, em Reservas, no Calendário e nos avisos junto com as do Airbnb, com o avatar tracejado em areia para diferenciar a origem.
+Uma folha que cobre a tela no celular e vira um painel central no computador. Começa por uma chave de duas posições: Custo ou Reserva. Campos obrigatórios levam asterisco; o resto é opcional e não bloqueia o salvar. Categorias e canais são pílulas de escolha única, não listas suspensas. Ao salvar, a folha fecha e um aviso curto confirma o que entrou ("Reserva de Ana salva.", com nome fictício neste exemplo). Editar abre a mesma folha preenchida, com "Excluir" no rodapé e confirmação. Reserva lançada por fora tem os mesmos dados de uma reserva do Airbnb (hóspede, entrada e saída com horário, valor recebido, canal, pessoas, pets, contato e observações) e aparece no Início, em Reservas, no Calendário e nos avisos junto com as do Airbnb, com o avatar tracejado em areia para diferenciar a origem.
 
 ### Calendário
 
